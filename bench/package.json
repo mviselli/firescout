@@ -1,0 +1,15 @@
+{
+  "name": "@firescout/bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --import tsx src/run.ts",
+    "typecheck": "tsc -p ."
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  },
+  "dependencies": {
+    "@firescout/sim": "workspace:*"
+  }
+}

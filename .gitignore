@@ -147,3 +147,12 @@ vite.config.ts.timestamp-*
 .venv/
 __pycache__/
 logs/
+
+# Editors / tool caches
+*.swp
+.ruff_cache/
+.pytest_cache/
+
+# FireScout outputs
+bench/logs/
+models/

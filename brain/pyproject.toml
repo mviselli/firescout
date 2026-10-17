@@ -1,0 +1,38 @@
+[project]
+name = "firescout-brain"
+version = "0.1.0"
+description = "FireScout decision server: Laya-MLX (System 1) with escalation to H2O-Lightning (System 2)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.143.3",
+    "httpx>=0.28.1",
+    "laya-mlx>=0.4.0",
+    "pydantic>=2.14.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+firescout-brain = "firescout_brain:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["model: needs the Laya checkpoint downloaded (run with -m model)"]
+addopts = "-m 'not model'"

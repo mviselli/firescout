@@ -1,0 +1,7 @@
+packages:
+  - sim
+  - web
+  - bench
+
+onlyBuiltDependencies:
+  - esbuild
