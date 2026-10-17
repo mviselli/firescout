@@ -25,4 +25,32 @@ export const SIM = {
   SMOKE_DIFFUSION: 0.2,
   SMOKE_DECAY_INDOOR: 0.002,
   SMOKE_DECAY_OUTDOOR: 0.05,
+
+  // Robot R1 (robot.ts)
+  /** Ticks per cell moved (0.3 s). */
+  ROBOT_MOVE_TICKS: 3,
+  /** Tank capacity for water and foam. */
+  TANK: 100,
+  /** Jet range in cells (Chebyshev), line of sight required. */
+  SPRAY_RANGE: 3,
+  /** Intensity removed per tick from each sprayed cell, before effectiveness. */
+  SPRAY_POWER: 0.15,
+  /** Tank units used per spraying tick. */
+  SPRAY_USE: 1,
+  /** Tank units refilled per tick on the base. */
+  REFILL_RATE: 5,
+  /** Agent effectiveness by fire class: A solids, B liquids (EN 2). */
+  EFFECTIVENESS: { water: { A: 1, B: 0.2 }, foam: { A: 0.6, B: 1 } },
+  /** Chance per tick that water on burning paint splashes the fire to a neighbour. */
+  WATER_ON_PAINT_SPREAD: 0.25,
+
+  // Doors (robot.ts)
+  /** Smoke behind a door at or above which opening it causes a backdraft. */
+  DOOR_SMOKE_THRESHOLD: 0.6,
+  BACKDRAFT_RADIUS: 2,
+  BACKDRAFT_INTENSITY: 0.9,
+  BACKDRAFT_STUN_TICKS: 30,
+  BACKDRAFT_WATER_LOSS: 20,
+  /** Ticks a door judged unsafe is left alone before the robot may try it again. */
+  DOOR_HOLD_TICKS: 30,
 } as const;
