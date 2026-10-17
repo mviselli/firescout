@@ -17,4 +17,12 @@ export const SIM = {
   BURN_RATE: 0.02,
   /** Intensity of a cell ignited by spread. */
   IGNITION_INTENSITY: 0.1,
+
+  // Smoke (smoke.ts)
+  /** Smoke added per tick by a burning cell at intensity 1. */
+  SMOKE_EMIT: 0.05,
+  /** Fraction of the gap to the neighbours' mean closed per tick. */
+  SMOKE_DIFFUSION: 0.2,
+  SMOKE_DECAY_INDOOR: 0.002,
+  SMOKE_DECAY_OUTDOOR: 0.05,
 } as const;
