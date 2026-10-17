@@ -19,7 +19,27 @@ export {
   W,
   xy,
 } from "./grid";
+export { lineOfSight } from "./los";
 export { buildYard, type Door, type Yard } from "./map";
 export { createRng, type Rng } from "./rng";
+export {
+  type Agent,
+  createRobot,
+  doorInnerSmoke,
+  holdDoor,
+  openDoor,
+  type Robot,
+  type RobotEvent,
+  setTask,
+  type Task,
+  tickRobot,
+} from "./robot";
 export { stepSmoke } from "./smoke";
-export type { Wind } from "./world";
+export {
+  createWorld,
+  type Stats,
+  simTime,
+  type Wind,
+  type World,
+  type WorldOptions,
+} from "./world";

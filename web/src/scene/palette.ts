@@ -19,6 +19,12 @@ export const PALETTE = {
   fireCore: 0xfff0c2,
   fireMid: 0xff7a1a,
   fireEdge: 0xc4280e,
+  robotBody: 0xeae6dc,
+  robotTracks: 0x2e3234,
+  robotStripe: 0xb3261e,
+  pathDot: 0xf4f1e8,
+  water: 0x5fb3e0,
+  foam: 0xf6f6f2,
 } as const;
 
 const BY_TYPE: Record<CellType, number> = {
