@@ -28,6 +28,8 @@ export interface PanelStatus {
   paused: boolean;
   ended: boolean;
   speed: number;
+  /** Why the last decision failed; the game waits until a retry succeeds. */
+  error: string | null;
 }
 
 export interface Panel {
@@ -211,9 +213,12 @@ export function createPanel(root: HTMLElement, handlers: PanelHandlers): Panel {
   const decision = el("section", "decision");
   decision.setAttribute("aria-live", "polite");
   const decisionTitle = el("h2", "", "Last decision");
+  const decisionError = el("p", "decision-error");
+  decisionError.setAttribute("role", "alert");
+  decisionError.hidden = true;
   const decisionBody = el("div", "decision-body");
   decisionBody.append(el("p", "empty", "Waiting for R1's first call."));
-  decision.append(decisionTitle, decisionBody);
+  decision.append(decisionTitle, decisionError, decisionBody);
 
   const keys = el("p", "keys", "Space pauses, N starts a new fire, C resets the camera.");
 
@@ -243,6 +248,11 @@ export function createPanel(root: HTMLElement, handlers: PanelHandlers): Panel {
       task.textContent = taskLabel(world);
       water.set(world.robot.water);
       foam.set(world.robot.foam);
+
+      decisionError.hidden = status.error === null;
+      decisionError.textContent = status.error
+        ? `The game is waiting: R1's decision failed (${status.error}). Asking again shortly.`
+        : "";
 
       if (lastDecision !== shownDecision) {
         shownDecision = lastDecision;

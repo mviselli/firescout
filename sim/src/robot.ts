@@ -220,6 +220,7 @@ function fireClass(world: World, i: number): "A" | "B" {
 function spray(world: World, target: number, agent: Agent, events: RobotEvent[]): void {
   const { robot, grid } = world;
   if (robot[agent] <= 0) {
+    robot.sprayTarget = null;
     report(robot, "tank_empty", events);
     return;
   }
@@ -321,6 +322,7 @@ export function tickRobot(world: World): RobotEvent[] {
   const events: RobotEvent[] = [];
   if (robot.stunned > 0) {
     robot.stunned--;
+    robot.sprayTarget = null;
     return events;
   }
   const { task } = robot;

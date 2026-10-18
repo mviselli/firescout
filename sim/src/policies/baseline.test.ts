@@ -3,7 +3,7 @@ import { buildContext, buildQuestions } from "../context";
 import type { Answer, DecisionReason, DecisionRequest } from "../decision";
 import { CellState, get, idx, N } from "../grid";
 import { createWorld, type World } from "../world";
-import { BaselinePolicy, softmax } from "./baseline";
+import { BaselinePolicy, choiceAnswer, softmax } from "./baseline";
 import { IdlePolicy } from "./idle";
 
 /** Seed-1 world with its random fire put out, so each test places its own fires. */
@@ -46,6 +46,16 @@ describe("softmax", () => {
     const p = softmax({ a: 1, b: 0 }, 0.5);
     expect((p.a ?? 0) + (p.b ?? 0)).toBeCloseTo(1, 12);
     expect(p.a).toBeCloseTo(1 / (1 + Math.exp(-2)), 12);
+  });
+});
+
+describe("choiceAnswer", () => {
+  it("reports confidence as Laya does: 1 − entropy / log(options)", () => {
+    expect(choiceAnswer({ a: 1, b: 0, c: 0 }).confidence).toBe(1);
+    expect(choiceAnswer({ a: 0.5, b: 0.5 }).confidence).toBeCloseTo(0, 12);
+    const p = { a: 0.7, b: 0.2, c: 0.1 };
+    const h = -(0.7 * Math.log(0.7) + 0.2 * Math.log(0.2) + 0.1 * Math.log(0.1));
+    expect(choiceAnswer(p)).toMatchObject({ choice: "a", confidence: 1 - h / Math.log(3) });
   });
 });
 
@@ -116,7 +126,9 @@ describe("BaselinePolicy", () => {
       expect(Object.keys(a.probabilities).sort()).toEqual(Object.keys(q.criteria).sort());
       const sum = Object.values(a.probabilities).reduce((s, p) => s + p, 0);
       expect(Math.abs(sum - 1)).toBeLessThan(1e-9);
-      expect(a.confidence).toBe(Math.max(...Object.values(a.probabilities)));
+      const ps = Object.values(a.probabilities);
+      const entropy = -ps.reduce((s, p) => s + (p > 0 ? p * Math.log(p) : 0), 0);
+      expect(a.confidence).toBeCloseTo(1 - entropy / Math.log(ps.length), 9);
     }
   });
 });

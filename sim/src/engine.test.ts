@@ -3,7 +3,7 @@ import { SIM } from "./config";
 import type { Answers, DecisionRequest } from "./decision";
 import { Engine } from "./engine";
 import { CellState, get, idx, N } from "./grid";
-import { choiceAnswer, noulAnswer } from "./policies/baseline";
+import { BaselinePolicy, choiceAnswer, noulAnswer } from "./policies/baseline";
 
 /** Engine on seed 1 with the random fire put out, so each test places its own fires. */
 function quietEngine(opts: { maxTime?: number } = {}): Engine {
@@ -126,7 +126,7 @@ describe("Engine", () => {
   });
 
   it("opens the door when door_safe ≥ 0.5 and holds otherwise", () => {
-    for (const safe of [0.9, 0.2]) {
+    for (const safe of [0.9, 0.5, 0.2]) {
       const e = quietEngine();
       burn(e, 34, 10);
       e.world.robot.x = 34;
@@ -142,14 +142,36 @@ describe("Engine", () => {
       e.resolve(req.id, answer(req, "wait", safe));
 
       const door = e.world.doors.find((d) => d.id === "B-south");
-      if (safe >= 0.5) {
+      if (safe > 0.5) {
         expect(door?.open).toBe(true);
       } else {
+        // An unsure answer is not a yes. Holding keeps the attack, so R1 plans around the door.
         expect(door?.open).toBe(false);
-        expect(e.world.robot.task.kind).toBe("wait");
+        expect(e.world.robot.task).toMatchObject({ kind: "attack", sector: "B5" });
         expect(e.world.robot.doorHold["B-south"]).toBeGreaterThan(e.world.tick);
       }
     }
+  });
+
+  it("does not re-ask every tick when the same blocked attack is chosen again", async () => {
+    const e = quietEngine();
+    burn(e, 53, 8); // north room of C, reachable only through C-inner
+    e.world.robot.x = 53;
+    e.world.robot.y = 14;
+    // Smoke-logged room, so the baseline judges C-inner unsafe and holds it.
+    for (let y = 6; y <= 10; y++) for (let x = 47; x <= 59; x++) e.world.grid.smoke[idx(x, y)] = 1;
+    const policy = new BaselinePolicy();
+    const reasons: string[] = [];
+    let r = e.step();
+    while (e.world.tick < 60 && r.kind !== "ended") {
+      if (r.kind === "pending") {
+        reasons.push(r.request.reason);
+        e.resolve(r.request.id, await policy.decide(r.request));
+      }
+      r = e.step();
+    }
+    expect(reasons).toContain("door");
+    expect(reasons.length).toBeLessThanOrEqual(60 / SIM.R1_CADENCE_TICKS + 4);
   });
 
   it("ends when no cell is burning or at maxTime", () => {

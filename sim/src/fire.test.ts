@@ -116,6 +116,19 @@ describe("stepFire", () => {
     expect(down).toBeGreaterThan(up * 1.5);
   });
 
+  it("never spreads into yard ground", () => {
+    const grid = createGrid(); // all Ground, fuel 0.03
+    for (let x = 0; x < W; x++) {
+      grid.type[idx(x, 5)] = CellType.Scrub;
+      grid.fuel[idx(x, 5)] = FUEL[CellType.Scrub];
+      ignite(grid, idx(x, 5), 1);
+    }
+    run(grid, { dx: 0, dy: 1, speedKmh: 30 }, 3, 200);
+    for (let i = 0; i < N; i++) {
+      if (get(grid.type, i) === CellType.Ground) expect(get(grid.state, i)).toBe(CellState.Intact);
+    }
+  });
+
   it("handles edges and corners", () => {
     const grid = scrubField();
     ignite(grid, idx(0, 0), 1);

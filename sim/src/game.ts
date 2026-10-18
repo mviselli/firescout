@@ -67,16 +67,44 @@ function fnv(h: number, value: number): number {
   return h;
 }
 
-/** FNV-1a 32-bit over cell state, fuel, intensity, robot position and tanks, and the tick. */
+const TASK_KINDS = ["wait", "attack", "refill"] as const;
+
+function fnvString(h: number, s: string): number {
+  for (let k = 0; k < s.length; k++) h = fnv(h, s.charCodeAt(k));
+  return fnv(h, 0);
+}
+
+/**
+ * FNV-1a 32-bit over everything that shapes the rest of the game: per cell state, fuel, intensity
+ * and smoke; doors and holds; the robot's position, tanks, task and stun; the stats; the tick.
+ */
 export function hashWorld(world: World): string {
-  const { grid, robot } = world;
+  const { grid, robot, stats } = world;
   let h = FNV_OFFSET;
   for (let i = 0; i < N; i++) {
     h = fnv(h, get(grid.state, i));
     h = fnv(h, Math.round(get(grid.fuel, i) * 1000));
     h = fnv(h, Math.round(get(grid.intensity, i) * 1000));
+    h = fnv(h, Math.round(get(grid.smoke, i) * 1000));
   }
-  for (const v of [robot.x, robot.y, Math.round(robot.water), Math.round(robot.foam), world.tick]) {
+  for (const d of world.doors) {
+    h = fnv(h, d.open ? 1 : 0);
+    h = fnv(h, robot.doorHold[d.id] ?? -1);
+  }
+  const { task } = robot;
+  h = fnv(h, TASK_KINDS.indexOf(task.kind));
+  if (task.kind === "attack") h = fnvString(fnvString(h, task.sector), task.agent);
+  for (const v of [
+    robot.x,
+    robot.y,
+    Math.round(robot.water),
+    Math.round(robot.foam),
+    robot.stunned,
+    stats.wrongAgent,
+    stats.riskyDoors,
+    stats.backdrafts,
+    world.tick,
+  ]) {
     h = fnv(h, v);
   }
   return (h >>> 0).toString(16).padStart(8, "0");

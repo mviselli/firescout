@@ -86,6 +86,7 @@ view.renderer.setAnimationLoop((now: number) => {
     paused: loop.paused,
     ended: loop.engine.ended,
     speed: loop.speed,
+    error: loop.error,
   });
   view.render();
 });

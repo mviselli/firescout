@@ -25,7 +25,14 @@ export function softmax(
   return exps;
 }
 
-/** Argmax (ties go to the first key) with the top probability as confidence. */
+/** Laya's `confidence`: 1 − entropy / log(options), so 0 is a uniform guess and 1 a certainty. */
+function entropyConfidence(ps: number[]): number {
+  if (ps.length < 2) return 1;
+  const entropy = -ps.reduce((s, p) => s + (p > 0 ? p * Math.log(p) : 0), 0);
+  return Math.min(1, Math.max(0, 1 - entropy / Math.log(ps.length)));
+}
+
+/** Argmax (ties go to the first key), with confidence measured the way Laya measures it. */
 export function choiceAnswer(probabilities: Record<string, number>): Answer {
   let choice = "";
   let best = -1;
@@ -35,9 +42,11 @@ export function choiceAnswer(probabilities: Record<string, number>): Answer {
       best = p;
     }
   }
-  return { type: "choice", choice, probabilities, confidence: best };
+  const confidence = entropyConfidence(Object.values(probabilities));
+  return { type: "choice", choice, probabilities, confidence };
 }
 
+/** For noul, Laya reports confidence as max(p, 1 − p). */
 export function noulAnswer(noul: number): Answer {
   return { type: "noul", noul, confidence: Math.max(noul, 1 - noul) };
 }

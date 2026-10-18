@@ -3,7 +3,15 @@ import { buildContext, buildQuestions } from "./context";
 import type { Answers, DecisionReason, DecisionRequest } from "./decision";
 import { stepFire } from "./fire";
 import { CellState, get, N } from "./grid";
-import { type Agent, holdDoor, openDoor, type RobotEvent, setTask, tickRobot } from "./robot";
+import {
+  type Agent,
+  holdDoor,
+  openDoor,
+  type RobotEvent,
+  setTask,
+  type Task,
+  tickRobot,
+} from "./robot";
 import { stepSmoke } from "./smoke";
 import { createWorld, simTime, type World, type WorldOptions } from "./world";
 
@@ -94,27 +102,25 @@ export class Engine {
     const { world } = this;
     const door = answers.door_safe;
     if (req.questions.door_safe && req.context.door && door?.type === "noul") {
-      if (door.noul >= 0.5) {
-        openDoor(world, req.context.door.id);
-      } else {
-        holdDoor(world, req.context.door.id);
-        setTask(world, { kind: "wait" });
-      }
+      // An unsure answer (0.5) is not a yes. Holding keeps the current task, so R1 plans around
+      // the door, or reports blocked if there is no other way.
+      if (door.noul > 0.5) openDoor(world, req.context.door.id);
+      else holdDoor(world, req.context.door.id);
     } else {
       const action = answers.action;
       const label = action?.type === "choice" ? action.choice : "wait";
       if (label.startsWith("attack_")) {
         const sector = label.slice("attack_".length);
         const agent = answers[`agent_${sector}`];
-        setTask(world, {
+        assign(world, {
           kind: "attack",
           sector,
           agent: agent?.type === "choice" ? (agent.choice as Agent) : "water",
         });
       } else if (label === "refill") {
-        setTask(world, { kind: "refill" });
+        assign(world, { kind: "refill" });
       } else {
-        setTask(world, { kind: "wait" });
+        assign(world, { kind: "wait" });
       }
     }
 
@@ -141,6 +147,19 @@ export class Engine {
       if (get(this.world.grid.state, i) === CellState.Burning) return true;
     return false;
   }
+}
+
+/**
+ * Set a new task, but leave an unchanged one alone: re-setting it would forget the events already
+ * reported (a re-chosen blocked attack would report blocked again on the next tick, forever).
+ */
+function assign(world: World, task: Task): void {
+  const cur = world.robot.task;
+  const same =
+    cur.kind === task.kind &&
+    (cur.kind !== "attack" ||
+      (task.kind === "attack" && cur.sector === task.sector && cur.agent === task.agent));
+  if (!same) setTask(world, task);
 }
 
 /** Every question answered with the right type, and every choice label one of its options. */

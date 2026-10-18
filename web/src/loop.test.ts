@@ -40,6 +40,17 @@ class DelayedPolicy implements Policy {
   }
 }
 
+/** Always answers with nothing, so the engine rejects every answer. */
+class BrokenPolicy implements Policy {
+  readonly name = "broken";
+  calls = 0;
+
+  async decide(): Promise<Answers> {
+    this.calls++;
+    return {};
+  }
+}
+
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 /** Answer the start request. Its frame's 0.1 s is not spent (no tick ran), so it carries over. */
@@ -88,6 +99,26 @@ describe("GameLoop", () => {
     loop.advance(10);
     expect(engine.world.tick).toBeGreaterThan(0);
     expect(engine.world.tick).toBeLessThanOrEqual(5);
+  });
+
+  it("backs off after a failed decision and reports the error", async () => {
+    const engine = new Engine({ seed: 1 });
+    const policy = new BrokenPolicy();
+    const loop = new GameLoop(engine, policy);
+    loop.advance(0.1);
+    await flush();
+    expect(policy.calls).toBe(1);
+    expect(loop.waiting).toBe(false);
+    expect(loop.error).toMatch(/missing answer/);
+    for (let k = 0; k < 5; k++) {
+      loop.advance(0.1);
+      await flush();
+    }
+    expect(policy.calls).toBe(1);
+    loop.advance(0.6); // 1.1 s of real time since the failure
+    await flush();
+    expect(policy.calls).toBe(2);
+    expect(engine.world.tick).toBe(0);
   });
 
   it("reaches the same final hash as runGame regardless of frame timing", async () => {

@@ -66,9 +66,23 @@ describe("runGame", () => {
 
 describe("hashWorld", () => {
   it("changes when the world changes", () => {
-    const e = new Engine({ seed: 1 });
-    const before = hashWorld(e.world);
-    e.world.robot.x++;
-    expect(hashWorld(e.world)).not.toBe(before);
+    const changes: ((w: Engine["world"]) => void)[] = [
+      (w) => w.robot.x++,
+      (w) => (w.grid.smoke[100] = 0.5),
+      (w) => {
+        const d = w.doors[0];
+        if (d) d.open = true;
+      },
+      (w) => (w.robot.doorHold["B-west"] = 40),
+      (w) => (w.robot.task = { kind: "refill" }),
+      (w) => (w.robot.stunned = 3),
+      (w) => w.stats.riskyDoors++,
+    ];
+    for (const change of changes) {
+      const e = new Engine({ seed: 1 });
+      const before = hashWorld(e.world);
+      change(e.world);
+      expect(hashWorld(e.world)).not.toBe(before);
+    }
   });
 });

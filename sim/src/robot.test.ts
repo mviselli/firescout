@@ -143,6 +143,27 @@ describe("robot: attack", () => {
   });
 });
 
+describe("robot: jet", () => {
+  it("stops drawing the jet while stunned or with an empty tank", () => {
+    const w = quietWorld();
+    burn(w, 34, 10);
+    place(w, 34, 13);
+    setTask(w, { kind: "attack", sector: "B5", agent: "foam" });
+    run(w, 1);
+    expect(w.robot.sprayTarget).not.toBeNull();
+    w.robot.stunned = 5;
+    run(w, 1);
+    expect(w.robot.sprayTarget).toBeNull();
+
+    w.robot.stunned = 0;
+    run(w, 1);
+    expect(w.robot.sprayTarget).not.toBeNull();
+    w.robot.foam = 0;
+    run(w, 1);
+    expect(w.robot.sprayTarget).toBeNull();
+  });
+});
+
 describe("robot: refill", () => {
   it("refills at base and emits refilled", () => {
     const w = quietWorld();

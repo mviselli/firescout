@@ -42,8 +42,10 @@ export function stepFire(grid: Grid, wind: Wind, rng: Rng): number[] {
         const ny = y + dy;
         if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
         const n = ny * W + nx;
+        // Same rule as ignite(): yard ground, walls and the base never catch.
+        if (get(grid.state, n) !== CellState.Intact || !isFlammable(grid, n) || pending[n])
+          continue;
         const fuel = get(grid.fuel, n);
-        if (get(grid.state, n) !== CellState.Intact || fuel <= 0 || pending[n]) continue;
         const diagonal = dx !== 0 && dy !== 0;
         const len = diagonal ? Math.SQRT2 : 1;
         const align = ((dx * wind.dx + dy * wind.dy) / len) * windStrength;
