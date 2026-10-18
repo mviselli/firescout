@@ -22,6 +22,7 @@ export {
   type StepResult,
 } from "./engine";
 export { ignite, stepFire } from "./fire";
+export { type GameResult, hashWorld, runGame } from "./game";
 export {
   type BuildingId,
   buildingOf,
