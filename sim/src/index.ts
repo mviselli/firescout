@@ -1,4 +1,20 @@
 export { SIM } from "./config";
+export {
+  buildContext,
+  buildQuestions,
+  type Content,
+  type DecisionContext,
+  type FireSector,
+  priority,
+} from "./context";
+export type {
+  Answer,
+  Answers,
+  DecisionReason,
+  DecisionRequest,
+  Policy,
+  Question,
+} from "./decision";
 export { ignite, stepFire } from "./fire";
 export {
   type BuildingId,

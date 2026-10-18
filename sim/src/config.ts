@@ -53,4 +53,10 @@ export const SIM = {
   BACKDRAFT_WATER_LOSS: 20,
   /** Ticks a door judged unsafe is left alone before the robot may try it again. */
   DOOR_HOLD_TICKS: 30,
+
+  // Decisions (context.ts)
+  /** Distance (cells) at which a fire's priority is halved. */
+  PRIORITY_DIST_SCALE: 16,
+  /** Fire sectors offered as attack options. */
+  TOP_FIRES: 3,
 } as const;
