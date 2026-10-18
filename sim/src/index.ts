@@ -15,6 +15,12 @@ export type {
   Policy,
   Question,
 } from "./decision";
+export {
+  type DecisionRecord,
+  Engine,
+  type EngineOptions,
+  type StepResult,
+} from "./engine";
 export { ignite, stepFire } from "./fire";
 export {
   type BuildingId,

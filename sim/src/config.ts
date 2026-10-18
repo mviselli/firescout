@@ -54,6 +54,12 @@ export const SIM = {
   /** Ticks a door judged unsafe is left alone before the robot may try it again. */
   DOOR_HOLD_TICKS: 30,
 
+  // Game (engine.ts)
+  /** Ticks between R1's routine decisions (0.8 s). */
+  R1_CADENCE_TICKS: 8,
+  /** Sim seconds after which a game ends. */
+  MAX_TIME: 300,
+
   // Decisions (context.ts)
   /** Distance (cells) at which a fire's priority is halved. */
   PRIORITY_DIST_SCALE: 16,
