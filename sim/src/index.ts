@@ -37,6 +37,14 @@ export {
 } from "./grid";
 export { lineOfSight } from "./los";
 export { buildYard, type Door, type Yard } from "./map";
+export {
+  BaselinePolicy,
+  choiceAnswer,
+  noulAnswer,
+  softmax,
+  uniformScoreAnswer,
+} from "./policies/baseline";
+export { IdlePolicy } from "./policies/idle";
 export { createRng, type Rng } from "./rng";
 export {
   type Agent,
