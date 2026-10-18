@@ -27,27 +27,32 @@ export async function runGame(opts: EngineOptions, policy: Policy): Promise<Game
   }
 
   const { world } = engine;
-  let saved = 0;
   let burned = 0;
-  for (let i = 0; i < N; i++) {
-    const state = get(world.grid.state, i);
-    if (state === CellState.Burned) burned++;
-    // A cell's type never changes, so its initial fuel tells whether it started flammable.
-    if (FUEL[get(world.grid.type, i) as CellType] <= 0.1) continue;
-    if (state !== CellState.Burned && state !== CellState.Burning) saved++;
-  }
+  for (let i = 0; i < N; i++) if (get(world.grid.state, i) === CellState.Burned) burned++;
 
   return {
     seed: opts.seed,
     policy: policy.name,
     t: simTime(world),
-    savedFraction: saved / world.initialFlammable,
+    savedFraction: savedFraction(world),
     burnedCells: burned,
     wrongAgent: world.stats.wrongAgent,
     riskyDoors: world.stats.riskyDoors,
     decisions: engine.log.length,
     hash: hashWorld(world),
   };
+}
+
+/** Initially flammable cells neither burned nor burning, over all of them. */
+export function savedFraction(world: World): number {
+  let saved = 0;
+  for (let i = 0; i < N; i++) {
+    // A cell's type never changes, so its initial fuel tells whether it started flammable.
+    if (FUEL[get(world.grid.type, i) as CellType] <= 0.1) continue;
+    const state = get(world.grid.state, i);
+    if (state !== CellState.Burned && state !== CellState.Burning) saved++;
+  }
+  return saved / world.initialFlammable;
 }
 
 const FNV_OFFSET = 0x811c9dc5;

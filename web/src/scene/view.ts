@@ -18,6 +18,7 @@ export function cellToWorld(x: number, y: number): [number, number] {
 }
 
 const FRAME = 46; // world units visible vertically at zoom 1
+const MIN_WIDTH = 84; // world units always visible horizontally, so the whole yard fits a narrow stage
 
 export function createView(container: HTMLElement): View {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -44,10 +45,11 @@ export function createView(container: HTMLElement): View {
     const w = container.clientWidth;
     const h = container.clientHeight;
     const aspect = w / h;
-    camera.left = (-FRAME * aspect) / 2;
-    camera.right = (FRAME * aspect) / 2;
-    camera.top = FRAME / 2;
-    camera.bottom = -FRAME / 2;
+    const frame = Math.max(FRAME, MIN_WIDTH / aspect);
+    camera.left = (-frame * aspect) / 2;
+    camera.right = (frame * aspect) / 2;
+    camera.top = frame / 2;
+    camera.bottom = -frame / 2;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
   }
