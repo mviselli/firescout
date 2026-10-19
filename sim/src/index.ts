@@ -65,6 +65,7 @@ export {
   type Task,
   tickRobot,
 } from "./robot";
+export { serializeState } from "./serialize";
 export { stepSmoke } from "./smoke";
 export {
   createWorld,
