@@ -205,7 +205,13 @@ function moveToward(
   const path =
     robot.moveCooldown > 0 && stillValid(world, robot.path, isGoal)
       ? robot.path
-      : findPath(here, isGoal, (i) => plannable(world, i), heuristic);
+      : findPath(
+          here,
+          isGoal,
+          (i) => plannable(world, i),
+          heuristic,
+          (i) => (isClosedDoor(world, i) ? SIM.CLOSED_DOOR_COST : 1),
+        );
   if (path === null) {
     robot.path = [];
     report(robot, "blocked", events);

@@ -240,6 +240,15 @@ describe("robot: doors", () => {
     expect(w.robot.doorAhead).not.toBe(first);
   });
 
+  it("walks through an open door rather than open a closed one nearby", () => {
+    const w = quietWorld();
+    door(w, "B-west").open = true;
+    burn(w, 34, 10);
+    setTask(w, { kind: "attack", sector: "B5", agent: "foam" });
+    expect(run(w, 400)).not.toContain("door");
+    expect(door(w, "B-south").open).toBe(false);
+  });
+
   it("measures the smoke behind a door", () => {
     const w = quietWorld();
     w.grid.smoke[idx(27, 12)] = 0.7;

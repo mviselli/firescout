@@ -53,6 +53,8 @@ export const SIM = {
   BACKDRAFT_WATER_LOSS: 20,
   /** Ticks a door judged unsafe is left alone before the robot may try it again. */
   DOOR_HOLD_TICKS: 30,
+  /** Planning cost of a closed door, in cells of detour: R1 walks up to this far to avoid opening one. */
+  CLOSED_DOOR_COST: 40,
 
   // Game (engine.ts)
   /** Ticks between R1's routine decisions (0.8 s). */

@@ -50,6 +50,25 @@ describe("findPath", () => {
     expectContiguous(start, path ?? []);
   });
 
+  it("prefers a longer route over an expensive cell", () => {
+    // wall at x = 20 with gaps at y = 10 (cost 100) and y = 14 (cost 1)
+    const wall = new Set<number>();
+    for (let y = 0; y < 40; y++) if (y !== 10 && y !== 14) wall.add(idx(20, y));
+    const expensive = idx(20, 10);
+    const start = idx(18, 10);
+    const goal = idx(22, 10);
+    const path = findPath(
+      start,
+      (i) => i === goal,
+      (i) => !wall.has(i),
+      manhattanTo(goal),
+      (i) => (i === expensive ? 100 : 1),
+    );
+    expect(path).toContain(idx(20, 14));
+    expect(path).not.toContain(expensive);
+    expectContiguous(start, path ?? []);
+  });
+
   it("returns null when the goal is enclosed", () => {
     const goal = idx(20, 20);
     const ring = new Set([idx(19, 20), idx(21, 20), idx(20, 19), idx(20, 21)]);

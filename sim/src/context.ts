@@ -111,11 +111,11 @@ export function buildContext(world: World, reason: DecisionReason): DecisionCont
   const { grid, robot } = world;
   const blocking = new Map<number, string>();
   for (const d of world.doors) if (doorBlocks(grid, d)) blocking.set(idx(d.x, d.y), d.id);
-  // A closed door costs more than any detour, so routes cross as few closed doors as possible.
+  // Same closed-door cost as R1's planner, so the doors named here are the ones R1 will open.
   const route = costMap(
     idx(robot.x, robot.y),
     (i) => get(grid.type, i) !== CellType.Wall,
-    (i) => (blocking.has(i) ? N : 1),
+    (i) => (blocking.has(i) ? SIM.CLOSED_DOOR_COST : 1),
   );
 
   const acc = new Map<string, SectorAcc>();

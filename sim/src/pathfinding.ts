@@ -65,8 +65,9 @@ function neighbours(i: number, out: Int32Array): void {
 }
 
 /**
- * A* on the 4-connected grid with unit step cost. Returns the cells to walk, excluding `start`
- * and ending on a goal; `[]` if `start` is a goal; `null` if no goal is reachable.
+ * A* on the 4-connected grid, where entering cell `i` costs `cost(i)` (default 1, must be ≥ 1 so
+ * the heuristic stays admissible). Returns the cells to walk, excluding `start` and ending on a
+ * goal; `[]` if `start` is a goal; `null` if no goal is reachable.
  * `passable` is not checked for `start`.
  */
 export function findPath(
@@ -74,6 +75,7 @@ export function findPath(
   isGoal: (i: number) => boolean,
   passable: (i: number) => boolean,
   heuristic: (i: number) => number,
+  cost: (i: number) => number = () => 1,
 ): number[] | null {
   if (isGoal(start)) return [];
   const g = new Float64Array(N).fill(Number.POSITIVE_INFINITY);
@@ -93,11 +95,12 @@ export function findPath(
       return path.reverse();
     }
     closed[i] = 1;
-    const gi = (g[i] as number) + 1;
     neighbours(i, nbrs);
     for (let k = 0; k < 4; k++) {
       const n = nbrs[k] as number;
-      if (n < 0 || closed[n] || gi >= (g[n] as number) || !passable(n)) continue;
+      if (n < 0 || closed[n] || !passable(n)) continue;
+      const gi = (g[i] as number) + cost(n);
+      if (gi >= (g[n] as number)) continue;
       g[n] = gi;
       from[n] = i;
       const h = heuristic(n);

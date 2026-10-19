@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildContext, buildQuestions, priority } from "./context";
 import { CellState, get, idx, N } from "./grid";
+import { type RobotEvent, setTask, tickRobot } from "./robot";
 import { createWorld, type World } from "./world";
 
 /** Seed-1 world with its random fire put out, so each test places its own fires. */
@@ -60,6 +61,21 @@ describe("buildContext", () => {
 
     for (const d of w.doors) if (d.id === "B-west") d.open = true;
     expect(buildContext(w, "cadence").fires[0]?.doors).toEqual([]);
+  });
+
+  it("names the door R1 will open when it plans the same route", () => {
+    const w = quietWorld();
+    for (const d of w.doors) if (d.id === "B-west") d.open = true;
+    burn(w, 34, 10);
+    expect(buildContext(w, "cadence").fires[0]?.doors).toEqual([]);
+
+    setTask(w, { kind: "attack", sector: "B5", agent: "foam" });
+    const events: RobotEvent[] = [];
+    for (let t = 0; t < 400; t++) {
+      events.push(...tickRobot(w));
+      w.tick++;
+    }
+    expect(events).not.toContain("door");
   });
 
   it("names every closed door on the way, interior ones included", () => {
