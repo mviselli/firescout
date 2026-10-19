@@ -1,0 +1,57 @@
+{
+  "type": "decision",
+  "id": 1,
+  "backend": "laya",
+  "escalated": false,
+  "latency_ms": 412.7,
+  "answers": {
+    "action": {
+      "type": "choice",
+      "choice": "attack_B5",
+      "probabilities": {
+        "attack_A1": 0.1834,
+        "attack_B5": 0.5121,
+        "attack_C2": 0.1702,
+        "refill": 0.0611,
+        "wait": 0.0732
+      },
+      "confidence": 0.2214,
+      "answer_confidence": 0.5121
+    },
+    "agent_A1": {
+      "type": "choice",
+      "choice": "water",
+      "probabilities": {
+        "water": 0.9312,
+        "foam": 0.0688
+      },
+      "confidence": 0.6378,
+      "answer_confidence": 0.9312
+    },
+    "agent_B5": {
+      "type": "choice",
+      "choice": "foam",
+      "probabilities": {
+        "water": 0.0451,
+        "foam": 0.9549
+      },
+      "confidence": 0.7343,
+      "answer_confidence": 0.9549
+    },
+    "agent_C2": {
+      "type": "choice",
+      "choice": "water",
+      "probabilities": {
+        "water": 0.9407,
+        "foam": 0.0593
+      },
+      "confidence": 0.6744,
+      "answer_confidence": 0.9407
+    }
+  },
+  "usage": {
+    "state_tokens": 96,
+    "state_tokens_dropped": 0,
+    "truncated_questions": []
+  }
+}

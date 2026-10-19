@@ -1,0 +1,12 @@
+{
+  "type": "decide",
+  "id": 2,
+  "unit": "R1",
+  "state": "t=0.0s unit=R1 sector=E4 task=wait water=62% foam=88%\nfires: 4 sectors burning, top 3:\n  A1 scrub 6 cells int=0.80 dist=60 doors=none\n  B5 paint 2 cells int=0.80 dist=28 doors=B-south\n  C2 paper 2 cells int=0.45 dist=41 doors=A-south\ndoor ahead: B-south, smoke behind it 0.00, backdraft risk above 0.60\nwind: from SE to NW, 5 km/h",
+  "questions": {
+    "door_safe": {
+      "type": "noul",
+      "instructions": "Opening door B-south now is safe."
+    }
+  }
+}

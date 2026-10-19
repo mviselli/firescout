@@ -1,0 +1,15 @@
+{
+  "name": "@firescout/brain-client",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@firescout/sim": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "type": "decide",
+  "id": 1,
+  "unit": "R1",
+  "state": "t=0.0s unit=R1 sector=E4 task=wait water=62% foam=88%\nfires: 4 sectors burning, top 3:\n  A1 scrub 6 cells int=0.80 dist=60 doors=none\n  B5 paint 2 cells int=0.80 dist=28 doors=B-south\n  C2 paper 2 cells int=0.45 dist=41 doors=A-south\nwind: from SE to NW, 5 km/h",
+  "questions": {
+    "action": {
+      "type": "choice",
+      "instructions": "What should robot R1 do next?",
+      "criteria": {
+        "attack_A1": "Scrub fire in A1: 6 cells, intensity 0.80, distance 60.",
+        "attack_B5": "Paint fire in B5: 2 cells, intensity 0.80, distance 28, behind closed door B-south.",
+        "attack_C2": "Paper fire in C2: 2 cells, intensity 0.45, distance 41, behind closed door A-south.",
+        "refill": "Return to base to refill water (62%) and foam (88%).",
+        "wait": "Hold position."
+      }
+    },
+    "agent_A1": {
+      "type": "choice",
+      "instructions": "Which extinguishing agent for the fire in A1 (dry vegetation, a solid fuel)?",
+      "criteria": {
+        "water": "Water jet. For solid fuels like paper, wood and vegetation.",
+        "foam": "Foam. For flammable liquids like paint and solvents."
+      }
+    },
+    "agent_B5": {
+      "type": "choice",
+      "instructions": "Which extinguishing agent for the fire in B5 (paint and solvents, a flammable liquid)?",
+      "criteria": {
+        "water": "Water jet. For solid fuels like paper, wood and vegetation.",
+        "foam": "Foam. For flammable liquids like paint and solvents."
+      }
+    },
+    "agent_C2": {
+      "type": "choice",
+      "instructions": "Which extinguishing agent for the fire in C2 (paper and cardboard, a solid fuel)?",
+      "criteria": {
+        "water": "Water jet. For solid fuels like paper, wood and vegetation.",
+        "foam": "Foam. For flammable liquids like paint and solvents."
+      }
+    }
+  }
+}

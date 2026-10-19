@@ -1,0 +1,6 @@
+{
+  "type": "hello",
+  "protocol": 1,
+  "backend": "laya",
+  "model": "aac6fef/laya-mlx"
+}

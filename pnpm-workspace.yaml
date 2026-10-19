@@ -2,6 +2,7 @@ packages:
   - sim
   - web
   - bench
+  - brain-client
 
 onlyBuiltDependencies:
   - esbuild

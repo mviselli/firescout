@@ -1,0 +1,16 @@
+{
+  "type": "decision",
+  "id": 2,
+  "backend": "mock",
+  "escalated": false,
+  "latency_ms": 0.4,
+  "answers": {
+    "door_safe": {
+      "type": "noul",
+      "noul": 0.85,
+      "confidence": 0.85,
+      "answer_confidence": null
+    }
+  },
+  "usage": null
+}

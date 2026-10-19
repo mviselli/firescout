@@ -1,0 +1,5 @@
+{
+  "type": "error",
+  "id": 3,
+  "message": "questions: at least one question is required"
+}

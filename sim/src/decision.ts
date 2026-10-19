@@ -7,11 +7,26 @@ export type Question =
   | { type: "noul"; instructions: string }
   | { type: "score"; instructions: string; criteria: string[] };
 
-/** Answers mirror Laya's output: probabilities over labels, `noul` = P(true). */
+/**
+ * Answers mirror Laya's output: probabilities over labels, `noul` = P(true). `confidence` is
+ * Laya's entropy-based value; `answer_confidence` (the calibrated top probability) is optional.
+ */
 export type Answer =
-  | { type: "choice"; choice: string; probabilities: Record<string, number>; confidence: number }
-  | { type: "noul"; noul: number; confidence: number }
-  | { type: "score"; score: number; probabilities: Record<string, number>; confidence: number };
+  | {
+      type: "choice";
+      choice: string;
+      probabilities: Record<string, number>;
+      confidence: number;
+      answer_confidence?: number;
+    }
+  | { type: "noul"; noul: number; confidence: number; answer_confidence?: number }
+  | {
+      type: "score";
+      score: number;
+      probabilities: Record<string, number>;
+      confidence: number;
+      answer_confidence?: number;
+    };
 
 export type Answers = Record<string, Answer>;
 
