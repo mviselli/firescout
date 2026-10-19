@@ -1,29 +1,20 @@
 import { SIM } from "./config";
 import { CellState, CellType, type Grid, get, H, idx, N, W } from "./grid";
-import type { Door } from "./map";
+import { type Door, doorBlocks } from "./map";
 
-const NEIGHBOURS_4 = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-] as const;
+// Scratch buffers reused every tick (the sim is single-threaded).
+const blocked = new Uint8Array(N);
+const src = new Float64Array(N);
 
 /** Cells smoke cannot occupy or cross: walls, and closed doors that have not burned through. */
-function blockedCells(grid: Grid, doors: readonly Door[]): Uint8Array {
-  const blocked = new Uint8Array(N);
-  for (let i = 0; i < N; i++) if (get(grid.type, i) === CellType.Wall) blocked[i] = 1;
-  for (const d of doors) {
-    const i = idx(d.x, d.y);
-    if (!d.open && get(grid.state, i) !== CellState.Burned) blocked[i] = 1;
-  }
-  return blocked;
+function markBlocked(grid: Grid, doors: readonly Door[]): void {
+  for (let i = 0; i < N; i++) blocked[i] = get(grid.type, i) === CellType.Wall ? 1 : 0;
+  for (const d of doors) if (doorBlocks(grid, d)) blocked[idx(d.x, d.y)] = 1;
 }
 
 /** One tick of smoke: emission, 4-neighbour diffusion, indoor/outdoor decay (double-buffered). */
 export function stepSmoke(grid: Grid, doors: readonly Door[]): void {
-  const blocked = blockedCells(grid, doors);
-  const src = new Float64Array(N);
+  markBlocked(grid, doors);
   for (let i = 0; i < N; i++) {
     const burning = get(grid.state, i) === CellState.Burning;
     src[i] = get(grid.smoke, i) + (burning ? SIM.SMOKE_EMIT * get(grid.intensity, i) : 0);
@@ -39,13 +30,21 @@ export function stepSmoke(grid: Grid, doors: readonly Door[]): void {
       const s = get(src, i);
       let sum = 0;
       let count = 0;
-      for (const [dx, dy] of NEIGHBOURS_4) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
-        const n = ny * W + nx;
-        if (blocked[n]) continue;
-        sum += get(src, n);
+      // Neighbours in a fixed order (right, left, down, up), so the float sums never change.
+      if (x < W - 1 && !blocked[i + 1]) {
+        sum += get(src, i + 1);
+        count++;
+      }
+      if (x > 0 && !blocked[i - 1]) {
+        sum += get(src, i - 1);
+        count++;
+      }
+      if (y < H - 1 && !blocked[i + W]) {
+        sum += get(src, i + W);
+        count++;
+      }
+      if (y > 0 && !blocked[i - W]) {
+        sum += get(src, i - W);
         count++;
       }
       const diffused = count > 0 ? s + SIM.SMOKE_DIFFUSION * (sum / count - s) : s;

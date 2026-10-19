@@ -1,5 +1,5 @@
 import { SIM } from "./config";
-import { CellState, type CellType, FUEL, type Grid, get, H, isFlammable, W } from "./grid";
+import { CellState, type CellType, FUEL, type Grid, get, H, isFlammable, N, W } from "./grid";
 import type { Rng } from "./rng";
 import type { Wind } from "./world";
 
@@ -13,6 +13,9 @@ const NEIGHBOURS: readonly (readonly [number, number])[] = [
   [0, 1],
   [1, 1],
 ];
+
+/** Cells already set to ignite this tick; a scratch buffer reused every tick. */
+const pending = new Uint8Array(N);
 
 /** Sets an intact, flammable cell burning. */
 export function ignite(grid: Grid, i: number, intensity: number): void {
@@ -30,7 +33,7 @@ export function ignite(grid: Grid, i: number, intensity: number): void {
 export function stepFire(grid: Grid, wind: Wind, rng: Rng): number[] {
   const windStrength = Math.min(1, wind.speedKmh / SIM.WIND_REF_KMH);
   const ignited: number[] = [];
-  const pending = new Uint8Array(grid.state.length);
+  pending.fill(0);
 
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {

@@ -1,10 +1,12 @@
 import {
   type BuildingId,
   buildingCode,
+  CellState,
   CellType,
   createGrid,
   FUEL,
   type Grid,
+  get,
   H,
   idx,
   W,
@@ -16,6 +18,11 @@ export interface Door {
   y: number;
   building: BuildingId;
   open: boolean;
+}
+
+/** A door blocks movement, sight, the jet and smoke while closed and not burned through. */
+export function doorBlocks(grid: Grid, door: Door): boolean {
+  return !door.open && get(grid.state, idx(door.x, door.y)) !== CellState.Burned;
 }
 
 export interface Yard {

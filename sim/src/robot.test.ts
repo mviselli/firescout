@@ -177,6 +177,34 @@ describe("robot: refill", () => {
   });
 });
 
+describe("robot: planning", () => {
+  it("keeps its plan while cooling down between steps", () => {
+    const w = quietWorld();
+    setTask(w, { kind: "refill" });
+    place(w, 10, 30);
+    run(w, 1); // plans and steps; the cooldown starts
+    const plan = w.robot.path;
+    expect(w.robot.moveCooldown).toBeGreaterThan(0);
+    run(w, 1);
+    expect(w.robot.path).toBe(plan);
+  });
+
+  it("replans during the cooldown once fire lands on its plan", () => {
+    const w = quietWorld();
+    setTask(w, { kind: "refill" });
+    place(w, 10, 30);
+    run(w, 1);
+    const plan = w.robot.path;
+    const onPath = plan[2];
+    if (onPath === undefined) throw new Error("expected a longer plan");
+    const [x, y] = xy(onPath);
+    burn(w, x, y);
+    run(w, 1);
+    expect(w.robot.path).not.toBe(plan);
+    expect(w.robot.path).not.toContain(onPath);
+  });
+});
+
 describe("robot: doors", () => {
   it("stops before a closed door and emits door", () => {
     const w = quietWorld();

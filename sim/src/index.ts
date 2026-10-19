@@ -43,7 +43,7 @@ export {
   xy,
 } from "./grid";
 export { lineOfSight } from "./los";
-export { buildYard, type Door, type Yard } from "./map";
+export { buildYard, type Door, doorBlocks, type Yard } from "./map";
 export {
   BaselinePolicy,
   choiceAnswer,

@@ -54,6 +54,16 @@ class Heap {
   }
 }
 
+/** Writes the 4 neighbours of `i` into `out` (up, left, right, down), -1 off the grid. */
+function neighbours(i: number, out: Int32Array): void {
+  const x = i % W;
+  const y = (i - x) / W;
+  out[0] = y > 0 ? i - W : -1;
+  out[1] = x > 0 ? i - 1 : -1;
+  out[2] = x < W - 1 ? i + 1 : -1;
+  out[3] = y < H - 1 ? i + W : -1;
+}
+
 /**
  * A* on the 4-connected grid with unit step cost. Returns the cells to walk, excluding `start`
  * and ending on a goal; `[]` if `start` is a goal; `null` if no goal is reachable.
@@ -70,6 +80,7 @@ export function findPath(
   const from = new Int32Array(N).fill(-1);
   const closed = new Uint8Array(N);
   const open = new Heap();
+  const nbrs = new Int32Array(4);
   g[start] = 0;
   open.push([heuristic(start), heuristic(start), start]);
 
@@ -82,15 +93,10 @@ export function findPath(
       return path.reverse();
     }
     closed[i] = 1;
-    const x = i % W;
-    const y = (i - x) / W;
     const gi = (g[i] as number) + 1;
-    for (const n of [
-      y > 0 ? i - W : -1,
-      x > 0 ? i - 1 : -1,
-      x < W - 1 ? i + 1 : -1,
-      y < H - 1 ? i + W : -1,
-    ]) {
+    neighbours(i, nbrs);
+    for (let k = 0; k < 4; k++) {
+      const n = nbrs[k] as number;
       if (n < 0 || closed[n] || gi >= (g[n] as number) || !passable(n)) continue;
       g[n] = gi;
       from[n] = i;
@@ -99,4 +105,40 @@ export function findPath(
     }
   }
   return null;
+}
+
+/**
+ * Dijkstra from `start` on the 4-connected grid, where entering cell `i` costs `cost(i)`.
+ * Returns the cost to reach every cell and its predecessor on a cheapest route (Infinity and -1
+ * when unreachable). Ties go to the lower cell index, so the result is deterministic.
+ */
+export function costMap(
+  start: number,
+  passable: (i: number) => boolean,
+  cost: (i: number) => number,
+): { dist: Float64Array; from: Int32Array } {
+  const dist = new Float64Array(N).fill(Number.POSITIVE_INFINITY);
+  const from = new Int32Array(N).fill(-1);
+  const closed = new Uint8Array(N);
+  const open = new Heap();
+  const nbrs = new Int32Array(4);
+  dist[start] = 0;
+  open.push([0, 0, start]);
+
+  while (open.size > 0) {
+    const [, , i] = open.pop() as Entry;
+    if (closed[i]) continue;
+    closed[i] = 1;
+    neighbours(i, nbrs);
+    for (let k = 0; k < 4; k++) {
+      const n = nbrs[k] as number;
+      if (n < 0 || closed[n] || !passable(n)) continue;
+      const d = (dist[i] as number) + cost(n);
+      if (d >= (dist[n] as number)) continue;
+      dist[n] = d;
+      from[n] = i;
+      open.push([d, 0, n]);
+    }
+  }
+  return { dist, from };
 }

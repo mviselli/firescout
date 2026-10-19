@@ -13,7 +13,7 @@ import {
   xy,
 } from "./grid";
 import { lineOfSight } from "./los";
-import type { Door } from "./map";
+import { type Door, doorBlocks } from "./map";
 import { findPath } from "./pathfinding";
 import type { World } from "./world";
 
@@ -82,7 +82,7 @@ function findDoor(world: World, id: string): Door {
 
 function isClosedDoor(world: World, i: number): boolean {
   const door = doorAt(world, i);
-  return door !== undefined && !door.open && get(world.grid.state, i) !== CellState.Burned;
+  return door !== undefined && doorBlocks(world.grid, door);
 }
 
 /** Cells the robot may plan through: no walls, no fire, closed doors only when not held. */
@@ -179,7 +179,21 @@ export function holdDoor(world: World, doorId: string): void {
   forget(world.robot, "door");
 }
 
-/** Plan toward any goal cell and take one step when the move cooldown allows. */
+/** The last plan still starts next to the robot, avoids walls, fire and held doors, and ends on a goal. */
+function stillValid(world: World, path: number[], isGoal: (i: number) => boolean): boolean {
+  const { robot } = world;
+  const first = path[0];
+  const last = path.at(-1);
+  if (first === undefined || last === undefined || !isGoal(last)) return false;
+  const [fx, fy] = xy(first);
+  if (Math.abs(fx - robot.x) + Math.abs(fy - robot.y) !== 1) return false;
+  return path.every((i) => plannable(world, i));
+}
+
+/**
+ * Plan toward any goal cell and take one step when the move cooldown allows. While cooling
+ * down, the previous plan is kept as long as it is still valid; every step replans.
+ */
 function moveToward(
   world: World,
   isGoal: (i: number) => boolean,
@@ -188,7 +202,10 @@ function moveToward(
 ): void {
   const { robot } = world;
   const here = idx(robot.x, robot.y);
-  const path = findPath(here, isGoal, (i) => plannable(world, i), heuristic);
+  const path =
+    robot.moveCooldown > 0 && stillValid(world, robot.path, isGoal)
+      ? robot.path
+      : findPath(here, isGoal, (i) => plannable(world, i), heuristic);
   if (path === null) {
     robot.path = [];
     report(robot, "blocked", events);

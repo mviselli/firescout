@@ -37,7 +37,7 @@ describe("buildContext", () => {
     expect(ctx.fires.map((f) => f.sector)).toEqual(["A1", "C2"]);
     const [a1, c2] = ctx.fires;
     if (!a1 || !c2) throw new Error("expected two fire sectors");
-    expect(a1).toMatchObject({ building: null, content: "scrub", burning: 6, door: null });
+    expect(a1).toMatchObject({ building: null, content: "scrub", burning: 6, doors: [] });
     expect(a1.meanIntensity).toBeCloseTo(0.8);
     expect(a1.maxIntensity).toBeCloseTo(0.8);
     // Robot spawns at (31, 35); nearest A1 fire cell is (5, 1).
@@ -56,10 +56,40 @@ describe("buildContext", () => {
     burn(w, 35, 10);
     const ctx = buildContext(w, "cadence");
     expect(ctx.fires[0]).toMatchObject({ sector: "B5", building: "B", content: "paint" });
-    expect(ctx.fires[0]?.door).toBe("B-south");
+    expect(ctx.fires[0]?.doors).toEqual(["B-south"]);
 
     for (const d of w.doors) if (d.id === "B-west") d.open = true;
-    expect(buildContext(w, "cadence").fires[0]?.door).toBeNull();
+    expect(buildContext(w, "cadence").fires[0]?.doors).toEqual([]);
+  });
+
+  it("names every closed door on the way, interior ones included", () => {
+    const w = quietWorld();
+    burn(w, 16, 10); // B3, east room of building A, only reachable through A-inner
+    burn(w, 50, 8); // B7, north room of building C, only reachable through C-inner
+    const doorsOf = (sector: string) =>
+      buildContext(w, "cadence").fires.find((f) => f.sector === sector)?.doors;
+
+    expect(doorsOf("B3")).toEqual(["A-south", "A-inner"]);
+    expect(doorsOf("B7")).toEqual(["C-south", "C-inner"]);
+
+    for (const d of w.doors) if (d.id === "A-south") d.open = true;
+    expect(doorsOf("B3")).toEqual(["A-inner"]);
+
+    // From inside the west room of A, only the inner door is in the way.
+    w.robot.x = 8;
+    w.robot.y = 15;
+    expect(doorsOf("B3")).toEqual(["A-inner"]);
+  });
+
+  it("does not count a burned-through door", () => {
+    const w = quietWorld();
+    burn(w, 16, 10);
+    const inner = w.doors.find((d) => d.id === "A-inner");
+    if (!inner) throw new Error("expected A-inner");
+    w.grid.state[idx(inner.x, inner.y)] = CellState.Burned;
+    expect(buildContext(w, "cadence").fires.find((f) => f.sector === "B3")?.doors).toEqual([
+      "A-south",
+    ]);
   });
 });
 
@@ -82,6 +112,17 @@ describe("buildQuestions", () => {
     );
     expect(action.criteria.refill).toBe("Return to base to refill water (100%) and foam (100%).");
     expect(action.criteria.wait).toBe("Hold position.");
+  });
+
+  it("lists several closed doors in walking order", () => {
+    const w = quietWorld();
+    burn(w, 16, 10);
+    const ctx = buildContext(w, "cadence");
+    const action = buildQuestions(ctx).action;
+    if (action?.type !== "choice") throw new Error("expected choice");
+    expect(action.criteria.attack_B3).toBe(
+      `Paper fire in B3: 1 cells, intensity 1.00, distance ${ctx.fires[0]?.dist}, behind closed doors A-south and A-inner.`,
+    );
   });
 
   it("asks one agent question per attack option", () => {

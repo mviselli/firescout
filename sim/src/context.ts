@@ -2,18 +2,17 @@ import { SIM } from "./config";
 import type { DecisionReason, Question } from "./decision";
 import {
   type BuildingId,
-  buildingCode,
   buildingOf,
   CellState,
   CellType,
   get,
   idx,
-  inBounds,
   N,
   sectorOf,
   xy,
 } from "./grid";
-import type { Door } from "./map";
+import { doorBlocks } from "./map";
+import { costMap } from "./pathfinding";
 import { doorInnerSmoke, type Task } from "./robot";
 import { simTime, type Wind, type World } from "./world";
 
@@ -28,8 +27,8 @@ export interface FireSector {
   maxIntensity: number;
   /** Manhattan distance from the robot to the sector's nearest burning cell. */
   dist: number;
-  /** Closed door to get through, when the fire is inside a building the robot is not in. */
-  door: string | null;
+  /** Closed doors on the way to the fire, in walking order; the route crosses as few as possible. */
+  doors: string[];
 }
 
 export interface DecisionContext {
@@ -87,36 +86,14 @@ function mostFrequent<K>(counts: Map<K, number>, keys: readonly K[]): K {
   return best;
 }
 
-/** A door that leads outside, as opposed to one between two rooms of the same building. */
-function isExterior(world: World, door: Door): boolean {
-  for (const [dx, dy] of [
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1],
-  ] as const) {
-    const x = door.x + dx;
-    const y = door.y + dy;
-    if (inBounds(x, y) && get(world.grid.building, idx(x, y)) === buildingCode(null)) return true;
+/** Closed doors crossed on the cheapest route to `target`, in walking order (not the target). */
+function doorsTo(from: Int32Array, blocking: Map<number, string>, target: number): string[] {
+  const doors: string[] = [];
+  for (let c = from[target] as number; c >= 0; c = from[c] as number) {
+    const id = blocking.get(c);
+    if (id !== undefined) doors.push(id);
   }
-  return false;
-}
-
-/** Nearest closed exterior door of `building`, or null if one is already open or burned. */
-function entryDoor(world: World, building: BuildingId): string | null {
-  const { robot } = world;
-  let best: Door | null = null;
-  let bestDist = Infinity;
-  for (const d of world.doors) {
-    if (d.building !== building || !isExterior(world, d)) continue;
-    if (d.open || get(world.grid.state, idx(d.x, d.y)) === CellState.Burned) return null;
-    const dist = Math.abs(d.x - robot.x) + Math.abs(d.y - robot.y);
-    if (dist < bestDist) {
-      best = d;
-      bestDist = dist;
-    }
-  }
-  return best?.id ?? null;
+  return doors.reverse();
 }
 
 interface SectorAcc {
@@ -124,12 +101,23 @@ interface SectorAcc {
   intensity: number;
   max: number;
   dist: number;
+  /** Burning cell that is cheapest to reach; the route to it decides `doors`. */
+  entry: number;
   contents: Map<Content, number>;
   buildings: Map<BuildingId | null, number>;
 }
 
 export function buildContext(world: World, reason: DecisionReason): DecisionContext {
   const { grid, robot } = world;
+  const blocking = new Map<number, string>();
+  for (const d of world.doors) if (doorBlocks(grid, d)) blocking.set(idx(d.x, d.y), d.id);
+  // A closed door costs more than any detour, so routes cross as few closed doors as possible.
+  const route = costMap(
+    idx(robot.x, robot.y),
+    (i) => get(grid.type, i) !== CellType.Wall,
+    (i) => (blocking.has(i) ? N : 1),
+  );
+
   const acc = new Map<string, SectorAcc>();
   for (let i = 0; i < N; i++) {
     if (get(grid.state, i) !== CellState.Burning) continue;
@@ -142,6 +130,7 @@ export function buildContext(world: World, reason: DecisionReason): DecisionCont
         intensity: 0,
         max: 0,
         dist: Infinity,
+        entry: i,
         contents: new Map(),
         buildings: new Map(),
       };
@@ -154,11 +143,11 @@ export function buildContext(world: World, reason: DecisionReason): DecisionCont
     s.intensity += intensity;
     s.max = Math.max(s.max, intensity);
     s.dist = Math.min(s.dist, Math.abs(x - robot.x) + Math.abs(y - robot.y));
+    if (get(route.dist, i) < get(route.dist, s.entry)) s.entry = i;
     s.contents.set(content, (s.contents.get(content) ?? 0) + 1);
     s.buildings.set(building, (s.buildings.get(building) ?? 0) + 1);
   }
 
-  const robotBuilding = buildingOf(grid, idx(robot.x, robot.y));
   const fires: FireSector[] = [];
   for (const [sector, s] of acc) {
     const building = mostFrequent(s.buildings, BUILDINGS);
@@ -170,7 +159,7 @@ export function buildContext(world: World, reason: DecisionReason): DecisionCont
       meanIntensity: s.intensity / s.cells,
       maxIntensity: s.max,
       dist: s.dist,
-      door: building !== null && building !== robotBuilding ? entryDoor(world, building) : null,
+      doors: doorsTo(route.from, blocking, s.entry),
     });
   }
   fires.sort(
@@ -202,6 +191,13 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/** ", behind closed doors A-south and A-inner", or "" with no doors. */
+function behindDoors(doors: readonly string[]): string {
+  if (doors.length === 0) return "";
+  if (doors.length === 1) return `, behind closed door ${doors[0]}`;
+  return `, behind closed doors ${doors.slice(0, -1).join(", ")} and ${doors.at(-1)}`;
+}
+
 export function buildQuestions(ctx: DecisionContext): Record<string, Question> {
   if (ctx.reason === "door" && ctx.door) {
     return {
@@ -212,10 +208,9 @@ export function buildQuestions(ctx: DecisionContext): Record<string, Question> {
   const top = ctx.fires.slice(0, SIM.TOP_FIRES);
   const criteria: Record<string, string> = {};
   for (const f of top) {
-    const door = f.door ? `, behind closed door ${f.door}` : "";
     criteria[`attack_${f.sector}`] =
       `${capitalize(f.content)} fire in ${f.sector}: ${f.burning} cells, ` +
-      `intensity ${f.meanIntensity.toFixed(2)}, distance ${f.dist}${door}.`;
+      `intensity ${f.meanIntensity.toFixed(2)}, distance ${f.dist}${behindDoors(f.doors)}.`;
   }
   criteria.refill = `Return to base to refill water (${ctx.robot.water}%) and foam (${ctx.robot.foam}%).`;
   criteria.wait = "Hold position.";

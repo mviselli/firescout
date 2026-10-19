@@ -1,14 +1,14 @@
-import { CellState, CellType, type Grid, get, idx } from "./grid";
-import type { Door } from "./map";
+import { CellType, type Grid, get, idx } from "./grid";
+import { type Door, doorBlocks } from "./map";
 
 /** Walls and closed, unburned doors block sight (and the jet). */
 export function blocksSight(grid: Grid, doors: readonly Door[], x: number, y: number): boolean {
   const i = idx(x, y);
   const type = get(grid.type, i);
   if (type === CellType.Wall) return true;
-  if (type !== CellType.Door || get(grid.state, i) === CellState.Burned) return false;
+  if (type !== CellType.Door) return false;
   const door = doors.find((d) => d.x === x && d.y === y);
-  return door ? !door.open : true;
+  return door === undefined || doorBlocks(grid, door);
 }
 
 /**

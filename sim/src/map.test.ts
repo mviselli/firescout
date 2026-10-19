@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildingOf,
+  CellState,
   type CellType,
   CellType as CT,
   FUEL,
@@ -12,7 +13,7 @@ import {
   W,
   xy,
 } from "./grid";
-import { buildYard } from "./map";
+import { buildYard, doorBlocks } from "./map";
 
 const yard = buildYard();
 const { grid } = yard;
@@ -111,5 +112,21 @@ describe("buildYard", () => {
 
   it("keeps the map within the grid", () => {
     expect(W * H).toBe(grid.type.length);
+  });
+});
+
+describe("doorBlocks", () => {
+  it("blocks while closed, not once opened or burned through", () => {
+    const { grid, doors } = buildYard();
+    const door = doors[0];
+    if (!door) throw new Error("expected a door");
+    expect(doorBlocks(grid, door)).toBe(true);
+    grid.state[idx(door.x, door.y)] = CellState.Burning;
+    expect(doorBlocks(grid, door)).toBe(true);
+    grid.state[idx(door.x, door.y)] = CellState.Burned;
+    expect(doorBlocks(grid, door)).toBe(false);
+    grid.state[idx(door.x, door.y)] = CellState.Intact;
+    door.open = true;
+    expect(doorBlocks(grid, door)).toBe(false);
   });
 });
