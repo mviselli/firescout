@@ -1,7 +1,7 @@
 """Sim-generated scenarios (shared/fixtures/scenarios) against the real Laya checkpoint.
 
-They pin what the game actually sends: every question fits the 512-token budget, and Laya answers the clear-cut
-cases as expected. Run with: uv run pytest -m model tests/test_laya_prompts.py
+They pin what the game actually sends: every question fits the 512-token budget, and Laya
+answers the clear-cut cases as expected. Run with: uv run pytest -m model tests/test_laya_prompts.py
 """
 
 import json
@@ -48,4 +48,5 @@ def test_answers_as_expected(agent, scenario):
             p = answer["noul"]
             assert (p > 0.5) == (expected == "true"), f"{qid}: P(true)={p:.3f}, expected {expected}"
         else:
-            assert answer["choice"] == expected, f"{qid}: {answer['probabilities']}, expected {expected}"
+            probs = answer["probabilities"]
+            assert answer["choice"] == expected, f"{qid}: {probs}, expected {expected}"
