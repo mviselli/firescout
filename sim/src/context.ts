@@ -213,7 +213,7 @@ export function buildQuestions(ctx: DecisionContext): Record<string, Question> {
       `intensity ${f.meanIntensity.toFixed(2)}, distance ${f.dist}${behindDoors(f.doors)}.`;
   }
   criteria.refill = `Return to base to refill water (${ctx.robot.water}%) and foam (${ctx.robot.foam}%).`;
-  criteria.wait = "Hold position.";
+  criteria.wait = "Stand still.";
 
   const questions: Record<string, Question> = {
     action: { type: "choice", instructions: "What should robot R1 do next?", criteria },
@@ -223,8 +223,8 @@ export function buildQuestions(ctx: DecisionContext): Record<string, Question> {
       type: "choice",
       instructions: `Which extinguishing agent for the fire in ${f.sector} (${CONTENT_DESCRIPTION[f.content]})?`,
       criteria: {
-        water: "Water jet. For solid fuels like paper, wood and vegetation.",
-        foam: "Foam. For flammable liquids like paint and solvents.",
+        water: "For solid fuels like paper and wood.",
+        foam: "For flammable liquids like paint and solvents.",
       },
     };
   }

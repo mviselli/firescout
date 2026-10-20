@@ -127,7 +127,13 @@ describe("buildQuestions", () => {
       `Paint fire in B5: 1 cells, intensity 1.00, distance ${ctx.fires.find((f) => f.sector === "B5")?.dist}, behind closed door B-south.`,
     );
     expect(action.criteria.refill).toBe("Return to base to refill water (100%) and foam (100%).");
-    expect(action.criteria.wait).toBe("Hold position.");
+    expect(action.criteria.wait).toBe("Stand still.");
+    expect(qs.agent_B5).toMatchObject({
+      criteria: {
+        water: "For solid fuels like paper and wood.",
+        foam: "For flammable liquids like paint and solvents.",
+      },
+    });
   });
 
   it("lists several closed doors in walking order", () => {

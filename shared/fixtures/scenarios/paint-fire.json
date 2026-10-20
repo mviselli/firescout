@@ -1,0 +1,27 @@
+{
+  "name": "paint-fire",
+  "state": "t=0.0s unit=R1 sector=E4 task=wait water=100% foam=100%\nfires: 1 sector burning:\n  B5 paint 6 cells int=0.80 dist=27 doors=B-south\nwind: from SE to NW, 5 km/h",
+  "questions": {
+    "action": {
+      "type": "choice",
+      "instructions": "What should robot R1 do next?",
+      "criteria": {
+        "attack_B5": "Paint fire in B5: 6 cells, intensity 0.80, distance 27, behind closed door B-south.",
+        "refill": "Return to base to refill water (100%) and foam (100%).",
+        "wait": "Stand still."
+      }
+    },
+    "agent_B5": {
+      "type": "choice",
+      "instructions": "Which extinguishing agent for the fire in B5 (paint and solvents, a flammable liquid)?",
+      "criteria": {
+        "water": "For solid fuels like paper and wood.",
+        "foam": "For flammable liquids like paint and solvents."
+      }
+    }
+  },
+  "expect": {
+    "action": "attack_B5",
+    "agent_B5": "foam"
+  }
+}

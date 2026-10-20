@@ -1,0 +1,42 @@
+{
+  "name": "worst-case",
+  "state": "t=0.0s unit=R1 sector=B2 task=wait water=7% foam=7%\nfires: 26 sectors burning, top 3:\n  C2 paper 1 cells int=0.80 dist=1 doors=none\n  B2 paper 1 cells int=0.80 dist=7 doors=none\n  C1 scrub 1 cells int=0.80 dist=9 doors=A-south\ndoor ahead: A-inner, smoke behind it 0.70, backdraft risk above 0.60\nwind: from SE to NW, 5 km/h",
+  "questions": {
+    "action": {
+      "type": "choice",
+      "instructions": "What should robot R1 do next?",
+      "criteria": {
+        "attack_C2": "Paper fire in C2: 1 cells, intensity 0.80, distance 1.",
+        "attack_B2": "Paper fire in B2: 1 cells, intensity 0.80, distance 7.",
+        "attack_C1": "Scrub fire in C1: 1 cells, intensity 0.80, distance 9, behind closed door A-south.",
+        "refill": "Return to base to refill water (7%) and foam (7%).",
+        "wait": "Stand still."
+      }
+    },
+    "agent_C2": {
+      "type": "choice",
+      "instructions": "Which extinguishing agent for the fire in C2 (paper and cardboard, a solid fuel)?",
+      "criteria": {
+        "water": "For solid fuels like paper and wood.",
+        "foam": "For flammable liquids like paint and solvents."
+      }
+    },
+    "agent_B2": {
+      "type": "choice",
+      "instructions": "Which extinguishing agent for the fire in B2 (paper and cardboard, a solid fuel)?",
+      "criteria": {
+        "water": "For solid fuels like paper and wood.",
+        "foam": "For flammable liquids like paint and solvents."
+      }
+    },
+    "agent_C1": {
+      "type": "choice",
+      "instructions": "Which extinguishing agent for the fire in C1 (dry vegetation, a solid fuel)?",
+      "criteria": {
+        "water": "For solid fuels like paper and wood.",
+        "foam": "For flammable liquids like paint and solvents."
+      }
+    }
+  },
+  "expect": {}
+}

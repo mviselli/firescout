@@ -59,3 +59,28 @@ descriptions work best.
 
 The optimizations are not worth it, so use eager mode. The sim pauses during decisions, so latency only affects the
 benchmark's wall time: about 50 seeds × ~200 decisions × ~2 questions × 0.1 s ≈ 1 h per Laya run.
+
+## Phase 2 prompt check (`brain/tests/test_laya_prompts.py`)
+
+Scenarios are generated from the real sim (`bench/src/fixtures.test.ts` → `shared/fixtures/scenarios/`). Every
+question of every scenario fits: 0 state tokens dropped, no truncated questions, no collapsed options.
+
+| scenario | expected | Laya | state tokens |
+|---|---|---|---|
+| `paint-fire` | `attack_B5`, foam | `attack_B5` 0.53, foam 0.69 | 64 |
+| `paper-fire` | water | water 0.72 (`attack_B3` 0.70) | 68 |
+| `smoky-door` (smoke 0.90) | unsafe | P(true) 0.21 | 86 |
+| `clear-door` (no smoke) | safe | P(true) 0.66 | 86 |
+| `empty-tanks` | (budget only) | `attack_B5` 0.62 | 64 |
+| `worst-case` (26 sectors, door ahead, 7% tanks) | (budget only) | `attack_C1` 0.67; foam ~0.55 on all three solid fires | 125 |
+
+Findings from ~30 wording variants:
+- **Laya never picks `refill`**: 0.01–0.08 under every option text, state line and label, even when the only other
+  option is `wait` (0.96). So the controller refills: an attack whose agent tank is empty becomes a refill, and a
+  tank that runs dry mid-attack sends R1 back to base, for every policy.
+- `wait` reads as attractive: "Hold position." beat a 6-cell paint fire (0.52 vs 0.42); "Stand still." flips it
+  (0.53). Adding analysis to `wait`/`refill` ("tanks are full", "fires keep burning") made `wait` win more often.
+- The agent question works on a single fire with the spike's short criteria (foam 0.69 on paint, water 0.72 on
+  paper), but with three fires in the state it is close to a coin flip in either direction (foam 0.36 on paint in
+  `decide-action.json`, foam ~0.55 on solids in `worst-case`). This is left to the benchmark's wrong-agent metric.
+- Laya does not weigh distances: in `worst-case` it picks the fire 9 cells away behind a door over one 1 cell away.

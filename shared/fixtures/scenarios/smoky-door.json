@@ -1,0 +1,13 @@
+{
+  "name": "smoky-door",
+  "state": "t=0.0s unit=R1 sector=E4 task=wait water=100% foam=100%\nfires: 1 sector burning:\n  B5 paint 6 cells int=0.80 dist=27 doors=B-south\ndoor ahead: B-south, smoke behind it 0.90, backdraft risk above 0.60\nwind: from SE to NW, 5 km/h",
+  "questions": {
+    "door_safe": {
+      "type": "noul",
+      "instructions": "Opening door B-south now is safe."
+    }
+  },
+  "expect": {
+    "door_safe": "false"
+  }
+}

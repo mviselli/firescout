@@ -1,0 +1,26 @@
+{
+  "name": "paper-fire",
+  "state": "t=0.0s unit=R1 sector=E4 task=wait water=100% foam=100%\nfires: 1 sector burning:\n  B3 paper 6 cells int=0.80 dist=39 doors=A-south,A-inner\nwind: from SE to NW, 5 km/h",
+  "questions": {
+    "action": {
+      "type": "choice",
+      "instructions": "What should robot R1 do next?",
+      "criteria": {
+        "attack_B3": "Paper fire in B3: 6 cells, intensity 0.80, distance 39, behind closed doors A-south and A-inner.",
+        "refill": "Return to base to refill water (100%) and foam (100%).",
+        "wait": "Stand still."
+      }
+    },
+    "agent_B3": {
+      "type": "choice",
+      "instructions": "Which extinguishing agent for the fire in B3 (paper and cardboard, a solid fuel)?",
+      "criteria": {
+        "water": "For solid fuels like paper and wood.",
+        "foam": "For flammable liquids like paint and solvents."
+      }
+    }
+  },
+  "expect": {
+    "agent_B3": "water"
+  }
+}
