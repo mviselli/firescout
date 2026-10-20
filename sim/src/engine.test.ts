@@ -102,6 +102,34 @@ describe("Engine", () => {
     const req = nextRequest(e);
     expect(req.reason).toBe("tank_empty");
     expect(e.world.tick).toBe(1);
+    expect(e.world.robot.task).toEqual({ kind: "refill" });
+  });
+
+  it("turns an attack whose agent tank is empty into a refill, for every policy", () => {
+    const e = quietEngine();
+    burn(e, 34, 10);
+    e.world.robot.foam = 0;
+    e.resolve(1, answer(expectPending(e), "attack_B5"));
+    expect(e.world.robot.task).toEqual({ kind: "refill" });
+
+    // Water is still there, so a water attack goes ahead (and counts as the wrong agent on paint).
+    const req = nextRequest(e);
+    const answers = answer(req, "attack_B5");
+    answers.agent_B5 = pick("water", ["water", "foam"]);
+    e.resolve(req.id, answers);
+    expect(e.world.robot.task).toEqual({ kind: "attack", sector: "B5", agent: "water" });
+    expect(e.world.stats.wrongAgent).toBe(1);
+  });
+
+  it("does not count the wrong agent for an attack it turned into a refill", () => {
+    const e = quietEngine();
+    burn(e, 34, 10);
+    e.world.robot.water = 0;
+    const answers = answer(expectPending(e), "attack_B5");
+    answers.agent_B5 = pick("water", ["water", "foam"]);
+    e.resolve(1, answers);
+    expect(e.world.robot.task).toEqual({ kind: "refill" });
+    expect(e.world.stats.wrongAgent).toBe(0);
   });
 
   it("rejects unknown labels, missing questions and wrong ids and stays pending", () => {

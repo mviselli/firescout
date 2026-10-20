@@ -243,8 +243,7 @@ function fireClass(world: World, i: number): "A" | "B" {
 function spray(world: World, target: number, agent: Agent, events: RobotEvent[]): void {
   const { robot, grid } = world;
   if (robot[agent] <= 0) {
-    robot.sprayTarget = null;
-    report(robot, "tank_empty", events);
+    goRefill(world, events);
     return;
   }
   robot[agent] = Math.max(0, robot[agent] - SIM.SPRAY_USE);
@@ -283,7 +282,13 @@ function spray(world: World, target: number, agent: Agent, events: RobotEvent[])
     }
   }
 
-  if (robot[agent] <= 0) report(robot, "tank_empty", events);
+  if (robot[agent] <= 0) goRefill(world, events);
+}
+
+/** An attack needs its agent: with that tank dry, R1 heads back to base whatever the policy said. */
+function goRefill(world: World, events: RobotEvent[]): void {
+  setTask(world, { kind: "refill" });
+  report(world.robot, "tank_empty", events);
 }
 
 function tickAttack(

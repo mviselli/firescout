@@ -121,6 +121,19 @@ describe("robot: attack", () => {
     expect(events.filter((e) => e === "tank_empty")).toHaveLength(1);
   });
 
+  it("heads back to refill on its own when the attack's tank runs dry", () => {
+    const w = quietWorld();
+    burn(w, 40, 28);
+    place(w, 40, 30);
+    w.robot.water = 2;
+    setTask(w, { kind: "attack", sector: "D6", agent: "water" });
+    const events = run(w, 10);
+    expect(w.robot.task).toEqual({ kind: "refill" });
+    expect(events.filter((e) => e === "tank_empty")).toHaveLength(1);
+    expect(runUntil(w, "refilled", 2000)).toBeGreaterThan(0);
+    expect(w.robot.water).toBe(SIM.TANK);
+  });
+
   it("emits task_done when its sector has no fire", () => {
     const w = quietWorld();
     setTask(w, { kind: "attack", sector: "D6", agent: "water" });

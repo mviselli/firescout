@@ -111,12 +111,13 @@ export class Engine {
       const label = action?.type === "choice" ? action.choice : "wait";
       if (label.startsWith("attack_")) {
         const sector = label.slice("attack_".length);
-        const agent = answers[`agent_${sector}`];
-        assign(world, {
-          kind: "attack",
-          sector,
-          agent: agent?.type === "choice" ? (agent.choice as Agent) : "water",
-        });
+        const answer = answers[`agent_${sector}`];
+        const agent: Agent = answer?.type === "choice" ? (answer.choice as Agent) : "water";
+        // An attack needs its agent: with that tank empty, R1 refills, whatever the policy.
+        assign(
+          world,
+          world.robot[agent] > 0 ? { kind: "attack", sector, agent } : { kind: "refill" },
+        );
       } else if (label === "refill") {
         assign(world, { kind: "refill" });
       } else {
