@@ -18,3 +18,9 @@ export {
   type Usage,
   UsageSchema,
 } from "./protocol";
+export {
+  type DecisionMeta,
+  RemotePolicy,
+  type RemotePolicyOptions,
+  type WebSocketLike,
+} from "./remote";
