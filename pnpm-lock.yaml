@@ -23,6 +23,9 @@ importers:
 
   bench:
     dependencies:
+      '@firescout/brain-client':
+        specifier: workspace:*
+        version: link:../brain-client
       '@firescout/sim':
         specifier: workspace:*
         version: link:../sim
@@ -44,6 +47,9 @@ importers:
 
   web:
     dependencies:
+      '@firescout/brain-client':
+        specifier: workspace:*
+        version: link:../brain-client
       '@firescout/sim':
         specifier: workspace:*
         version: link:../sim

@@ -16,7 +16,13 @@ export interface PanelHandlers {
   /** Compass bearing the wind blows from (0 = north, clockwise), or null for the seed's own wind. */
   onWind(dirDeg: number | null): void;
   onSpeed(x: number): void;
+  onPolicy(policy: PolicyChoice): void;
 }
+
+export type PolicyChoice = "brain" | "baseline";
+
+/** Who answered the last decision: the brain, the fallback rules, the chosen rules, or nobody yet. */
+export type PolicyTone = "brain" | "fallback" | "rules" | "waiting";
 
 export interface LastDecision {
   req: DecisionRequest;
@@ -30,6 +36,12 @@ export interface PanelStatus {
   speed: number;
   /** Why the last decision failed; the game waits until a retry succeeds. */
   error: string | null;
+  policyChoice: PolicyChoice;
+  /** Badge text, e.g. "Laya · 94 ms" or "Brain offline, baseline rules". */
+  policy: string;
+  policyTone: PolicyTone;
+  /** Why the brain was not used for the last decision (badge tooltip). */
+  policyDetail?: string;
 }
 
 export interface Panel {
@@ -162,8 +174,25 @@ export function createPanel(root: HTMLElement, handlers: PanelHandlers): Panel {
 
   const header = el("header", "panel-head");
   const title = el("h1", "", "FireScout");
+  const fireRow = el("div", "fire-row");
   const fireName = el("p", "fire-name");
-  header.append(title, fireName);
+  const policySelect = el("select", "policy-select");
+  policySelect.setAttribute("aria-label", "Who decides for R1");
+  for (const [value, label] of [
+    ["brain", "Laya decides"],
+    ["baseline", "Rules decide"],
+  ] as const) {
+    const o = el("option", "", label);
+    o.value = value;
+    policySelect.append(o);
+  }
+  policySelect.addEventListener("change", () =>
+    handlers.onPolicy(policySelect.value === "baseline" ? "baseline" : "brain"),
+  );
+  fireRow.append(fireName, policySelect);
+  const badge = el("p", "policy-badge");
+  badge.setAttribute("aria-live", "polite");
+  header.append(title, fireRow, badge);
 
   const clock = el("p", "clock");
   const stats = el("p", "stats");
@@ -228,7 +257,11 @@ export function createPanel(root: HTMLElement, handlers: PanelHandlers): Panel {
 
   return {
     update(world, lastDecision, status) {
-      fireName.textContent = `Fire ${status.seed}, baseline rules`;
+      fireName.textContent = `Fire ${status.seed}`;
+      if (policySelect.value !== status.policyChoice) policySelect.value = status.policyChoice;
+      if (badge.textContent !== status.policy) badge.textContent = status.policy;
+      badge.dataset.tone = status.policyTone;
+      badge.title = status.policyDetail ?? "";
       const t = simTime(world);
       clock.textContent = status.ended
         ? `Over at ${t.toFixed(1)} s`

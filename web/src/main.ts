@@ -1,5 +1,7 @@
-import { BaselinePolicy, Engine, type Wind } from "@firescout/sim";
-import { createPanel, type LastDecision } from "./hud/panel";
+import { RemotePolicy } from "@firescout/brain-client";
+import { BaselinePolicy, Engine, type Policy, type Wind } from "@firescout/sim";
+import { policyBadge } from "./hud/badge";
+import { createPanel, type LastDecision, type PolicyChoice } from "./hud/panel";
 import { GameLoop } from "./loop";
 import { createFire } from "./scene/fire";
 import { createRobotView } from "./scene/robot";
@@ -9,7 +11,17 @@ import { createView } from "./scene/view";
 const stage = document.getElementById("stage") as HTMLElement;
 const panelRoot = document.getElementById("panel") as HTMLElement;
 const view = createView(stage);
-const policy = new BaselinePolicy();
+const baseline = new BaselinePolicy();
+// One brain connection for the page's lifetime; it falls back to the rules while the brain is away.
+const brain = new RemotePolicy({
+  url: import.meta.env.VITE_BRAIN_URL ?? "ws://127.0.0.1:8765/ws",
+  fallback: baseline,
+});
+let policyChoice: PolicyChoice = "brain";
+
+function currentPolicy(): Policy {
+  return policyChoice === "brain" ? brain : baseline;
+}
 
 let seed = 1;
 /** Bearing the wind blows from, chosen in the panel; null keeps the seed's own wind. */
@@ -30,7 +42,7 @@ function newLoop(): GameLoop {
     wind = { dx: -Math.sin(rad), dy: Math.cos(rad), speedKmh: 15 };
   }
   const engine = new Engine(wind ? { seed, wind } : { seed });
-  const next = new GameLoop(engine, policy, { speed });
+  const next = new GameLoop(engine, currentPolicy(), { speed });
   next.onDecision = (req, answers) => {
     if (loop === next) lastDecision = { req, answers };
   };
@@ -59,6 +71,11 @@ const panel = createPanel(panelRoot, {
     speed = x;
     loop.speed = x;
   },
+  onPolicy(choice) {
+    // Same seed, so the two policies can be compared on the same fire.
+    policyChoice = choice;
+    restart();
+  },
 });
 
 window.addEventListener("keydown", (e) => {
@@ -81,12 +98,17 @@ view.renderer.setAnimationLoop((now: number) => {
   terrain.update(world);
   fire.update(world.grid, now / 1000);
   robotView.update(world.robot, Math.min(dt, 0.25), now / 1000);
+  const badge = policyBadge(policyChoice, brain.lastMeta);
   panel.update(world, lastDecision, {
     seed,
     paused: loop.paused,
     ended: loop.engine.ended,
     speed: loop.speed,
     error: loop.error,
+    policyChoice,
+    policy: badge.text,
+    policyTone: badge.tone,
+    ...(badge.detail === undefined ? {} : { policyDetail: badge.detail }),
   });
   view.render();
 });

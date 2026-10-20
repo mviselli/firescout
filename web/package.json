@@ -9,6 +9,7 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
+    "@firescout/brain-client": "workspace:*",
     "@firescout/sim": "workspace:*",
     "three": "^0.186.1"
   },

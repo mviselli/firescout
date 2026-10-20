@@ -4,12 +4,14 @@
   "type": "module",
   "scripts": {
     "start": "node --import tsx src/run.ts",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "e2e": "node --import tsx src/e2e.ts"
   },
   "devDependencies": {
     "tsx": "^4.23.15"
   },
   "dependencies": {
+    "@firescout/brain-client": "workspace:*",
     "@firescout/sim": "workspace:*"
   }
 }
