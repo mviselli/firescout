@@ -139,7 +139,12 @@ export class RemotePolicy implements Policy {
     socket.onclose = () => {
       if (this.socket === socket) this.onClosed();
     };
-    socket.onerror = () => {};
+    // Node's WebSocket reports a refused connection with `error` alone, never `close`.
+    socket.onerror = () => {
+      if (this.socket !== socket || socket.readyState === OPEN) return;
+      this.onClosed();
+      socket.close();
+    };
   }
 
   private onClosed(): void {

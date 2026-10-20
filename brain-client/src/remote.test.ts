@@ -304,6 +304,23 @@ describe("RemotePolicy", () => {
     expect(policy.lastMeta?.source).toBe("brain");
   });
 
+  it("treats an error before open as a failed connection and retries", async () => {
+    // Node 22's WebSocket fires only `error` (no `close`) when the connection is refused.
+    const { sockets, connect } = fakeConnect();
+    const policy = new RemotePolicy({
+      url: "ws://test/ws",
+      fallback: new BaselinePolicy(),
+      connect,
+    });
+    sockets[0]?.onerror?.();
+    expect(policy.status).toBe("closed");
+    expect(sockets[0]?.closed).toBe(true);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(sockets).toHaveLength(2);
+    sockets[1]?.open();
+    expect(policy.status).toBe("open");
+  });
+
   it("keeps retrying while the brain stays down, and stops after close()", async () => {
     const { sockets, connect } = fakeConnect();
     const policy = new RemotePolicy({ url: "ws://test/ws", fallback: null, connect });
