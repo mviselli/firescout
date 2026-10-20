@@ -171,3 +171,20 @@ def test_cli_defaults_and_overrides():
     assert args.log == Path("logs/decisions.jsonl")
     args = parse_args(["--backend", "mock", "--port", "9000", "--log", "x.jsonl"])
     assert (args.backend, args.port, args.log) == ("mock", 9000, Path("x.jsonl"))
+
+
+class BrokenLog(DecisionLog):
+    def __init__(self):
+        super().__init__(Path("/nonexistent"))
+
+    def write(self, request, response):
+        raise OSError("disk full")
+
+
+def test_a_failing_log_still_answers_and_keeps_the_socket_open():
+    with TestClient(create_app(MockBackend(), BrokenLog())) as c, c.websocket_connect("/ws") as ws:
+        receive(ws)
+        for request in (ACTION, DOOR):
+            ws.send_text(json.dumps(request))
+            reply = receive(ws)
+            assert isinstance(reply, DecisionResponse) and reply.id == request["id"]

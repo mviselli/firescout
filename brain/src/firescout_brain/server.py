@@ -54,7 +54,11 @@ def create_app(backend: DecisionBackend, log: DecisionLog | None = None) -> Fast
             usage=result.usage,
         )
         if log is not None:
-            log.write(request, response)
+            # A broken log must never cost the client its answer or its socket.
+            try:
+                log.write(request, response)
+            except OSError:
+                logger.exception("could not log decision %d", request.id)
         return response
 
     @app.websocket("/ws")

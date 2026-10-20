@@ -265,10 +265,18 @@ describe("RemotePolicy", () => {
     await unknown;
     expect(policy.lastMeta?.reason).toContain("attack_Z9");
 
+    const inherited = policy.decide(req);
+    const proto = waitAnswers(req);
+    proto.action = choiceAnswer({ constructor: 1 });
+    socket.push(decision(3, proto));
+    await inherited;
+    expect(policy.lastMeta).toMatchObject({ source: "fallback" });
+    expect(policy.lastMeta?.reason).toContain("constructor");
+
     const wrongType = policy.decide(req);
     const typed = waitAnswers(req);
     typed.action = noulAnswer(0.9);
-    socket.push(decision(3, typed));
+    socket.push(decision(4, typed));
     await wrongType;
     expect(policy.lastMeta?.reason).toContain("action");
   });

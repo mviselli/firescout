@@ -255,7 +255,7 @@ function mapAnswers(req: DecisionRequest, wire: Record<string, WireAnswer>): Ans
     const a = wire[qid];
     if (!a) return `missing answer for ${qid}`;
     if (a.type !== q.type) return `answer for ${qid} is ${a.type}, expected ${q.type}`;
-    if (q.type === "choice" && a.type === "choice" && !(a.choice in q.criteria)) {
+    if (q.type === "choice" && a.type === "choice" && !Object.hasOwn(q.criteria, a.choice)) {
       return `answer for ${qid}: ${a.choice} is not an option`;
     }
     answers[qid] = toSim(a);

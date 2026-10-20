@@ -139,6 +139,9 @@ describe("Engine", () => {
     const good = answer(req);
 
     expect(() => e.resolve(2, good)).toThrow(/id/);
+    expect(() => e.resolve(1, { ...good, action: pick("toString", ["toString"]) })).toThrow(
+      /action.*toString/,
+    );
     expect(() => e.resolve(1, { ...good, action: pick("attack_Z9", ["attack_Z9"]) })).toThrow(
       /action.*attack_Z9/,
     );

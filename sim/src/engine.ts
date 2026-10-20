@@ -170,7 +170,7 @@ function validate(req: DecisionRequest, answers: Answers): void {
     if (!a) throw new Error(`missing answer for question ${id}`);
     if (a.type !== q.type)
       throw new Error(`question ${id} expects a ${q.type} answer, got ${a.type}`);
-    if (q.type === "choice" && a.type === "choice" && !(a.choice in q.criteria)) {
+    if (q.type === "choice" && a.type === "choice" && !Object.hasOwn(q.criteria, a.choice)) {
       throw new Error(`question ${id}: label ${a.choice} is not an option`);
     }
   }
