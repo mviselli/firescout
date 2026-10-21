@@ -32,12 +32,13 @@ export class LiveSession {
     this.loop.onDecision = (req, answers) => {
       if (!this.disposed) this.history.addDecision(req, answers, opts.sourceOf());
     };
+    // Sampled per tick, not per frame, so a replay rebuilds the same samples.
+    this.loop.onTick = (world) => this.history.sample(world);
     this.history.sample(this.loop.engine.world);
   }
 
   advance(realDtSec: number): void {
     this.loop.advance(realDtSec);
-    this.history.sample(this.loop.engine.world);
   }
 
   recording(): Recording {

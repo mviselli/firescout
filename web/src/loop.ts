@@ -1,4 +1,11 @@
-import { type Answers, type DecisionRequest, type Engine, type Policy, SIM } from "@firescout/sim";
+import {
+  type Answers,
+  type DecisionRequest,
+  type Engine,
+  type Policy,
+  SIM,
+  type World,
+} from "@firescout/sim";
 
 /** Longest stretch of sim time one frame may catch up on. */
 const MAX_CATCH_UP = 0.5;
@@ -14,6 +21,8 @@ export class GameLoop {
   paused = false;
   speed: number;
   onDecision?: (req: DecisionRequest, answers: Answers) => void;
+  /** Called after every tick the engine runs. */
+  onTick?: (world: World) => void;
   private acc = 0;
   private inFlight = false;
   private failures = 0;
@@ -54,7 +63,10 @@ export class GameLoop {
     while (this.acc >= SIM.TICK) {
       const tick = this.engine.world.tick;
       const r = this.engine.step();
-      if (this.engine.world.tick !== tick) this.acc -= SIM.TICK;
+      if (this.engine.world.tick !== tick) {
+        this.acc -= SIM.TICK;
+        this.onTick?.(this.engine.world);
+      }
       if (r.kind === "ended") {
         this.acc = 0;
         return;
