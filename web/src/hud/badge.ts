@@ -1,4 +1,5 @@
 import type { DecisionMeta } from "@firescout/brain-client";
+import type { DecisionSource } from "@firescout/sim";
 import type { PolicyChoice, PolicyTone } from "./panel";
 
 export interface Badge {
@@ -8,15 +9,19 @@ export interface Badge {
   detail?: string;
 }
 
-/** The panel's line saying who answered R1's last decision. */
-export function policyBadge(choice: PolicyChoice, meta: DecisionMeta | null): Badge {
+/** Who answered, from RemotePolicy's meta: the brain's backend, or the rules standing in. */
+export function sourceFromMeta(meta: DecisionMeta): DecisionSource {
+  if (meta.source === "brain") return { backend: meta.backend, latencyMs: meta.latencyMs };
+  return { backend: "baseline", latencyMs: meta.latencyMs, fallback: meta.reason ?? "offline" };
+}
+
+/** The panel's line saying who answered R1's last decision in this game. */
+export function policyBadge(choice: PolicyChoice, source: DecisionSource | null): Badge {
   if (choice === "baseline") return { text: "Baseline rules", tone: "rules" };
-  if (!meta) return { text: "Brain connecting…", tone: "waiting" };
-  if (meta.source === "brain") {
-    const name = meta.backend.charAt(0).toUpperCase() + meta.backend.slice(1);
-    return { text: `${name} · ${Math.round(meta.latencyMs)} ms`, tone: "brain" };
+  if (!source) return { text: "Brain connecting…", tone: "waiting" };
+  if (source.fallback !== undefined) {
+    return { text: "Brain offline, baseline rules", tone: "fallback", detail: source.fallback };
   }
-  const badge: Badge = { text: "Brain offline, baseline rules", tone: "fallback" };
-  if (meta.reason) badge.detail = meta.reason;
-  return badge;
+  const name = source.backend.charAt(0).toUpperCase() + source.backend.slice(1);
+  return { text: `${name} · ${Math.round(source.latencyMs ?? 0)} ms`, tone: "brain" };
 }

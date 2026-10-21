@@ -1,12 +1,12 @@
 import { RemotePolicy } from "@firescout/brain-client";
-import { BaselinePolicy, Engine, type Policy, type Wind } from "@firescout/sim";
-import { policyBadge } from "./hud/badge";
-import { createPanel, type LastDecision, type PolicyChoice } from "./hud/panel";
-import { GameLoop } from "./loop";
+import { BaselinePolicy, type DecisionSource, type Policy, type Wind } from "@firescout/sim";
+import { policyBadge, sourceFromMeta } from "./hud/badge";
+import { createPanel, type PolicyChoice } from "./hud/panel";
 import { createFire } from "./scene/fire";
 import { createRobotView } from "./scene/robot";
 import { createTerrain } from "./scene/terrain";
 import { createView } from "./scene/view";
+import { LiveSession } from "./session";
 
 const stage = document.getElementById("stage") as HTMLElement;
 const panelRoot = document.getElementById("panel") as HTMLElement;
@@ -27,36 +27,43 @@ let seed = 1;
 /** Bearing the wind blows from, chosen in the panel; null keeps the seed's own wind. */
 let windFromDeg: number | null = null;
 let speed = 1;
-let loop = newLoop();
-let lastDecision: LastDecision | null = null;
+let session = newSession();
 
-const terrain = createTerrain(view.scene, loop.engine.world);
+const terrain = createTerrain(view.scene, session.loop.engine.world);
 const fire = createFire(view.scene);
 const robotView = createRobotView(view.scene);
 
-function newLoop(): GameLoop {
+/** Who answered the decision that just resolved. */
+function currentSource(): DecisionSource {
+  if (policyChoice === "baseline") return { backend: "baseline" };
+  return brain.lastMeta ? sourceFromMeta(brain.lastMeta) : { backend: "brain" };
+}
+
+function newSession(): LiveSession {
   let wind: Wind | undefined;
   if (windFromDeg !== null) {
     const rad = (windFromDeg * Math.PI) / 180;
     // Blows toward the opposite bearing; y grows southward on the grid.
     wind = { dx: -Math.sin(rad), dy: Math.cos(rad), speedKmh: 15 };
   }
-  const engine = new Engine(wind ? { seed, wind } : { seed });
-  const next = new GameLoop(engine, currentPolicy(), { speed });
-  next.onDecision = (req, answers) => {
-    if (loop === next) lastDecision = { req, answers };
-  };
-  return next;
+  return new LiveSession({
+    engine: wind ? { seed, wind } : { seed },
+    policy: currentPolicy(),
+    policyChoice,
+    speed,
+    sourceOf: currentSource,
+  });
 }
 
 function restart(): void {
-  loop = newLoop();
-  lastDecision = null;
+  // The old session's in-flight answer, if any, is dropped with it.
+  session.dispose();
+  session = newSession();
 }
 
 const panel = createPanel(panelRoot, {
   onPause() {
-    loop.paused = !loop.paused;
+    session.loop.paused = !session.loop.paused;
   },
   onNewSeed() {
     // Only the sim must be deterministic; picking the next seed is a UI choice.
@@ -69,7 +76,7 @@ const panel = createPanel(panelRoot, {
   },
   onSpeed(x) {
     speed = x;
-    loop.speed = x;
+    session.loop.speed = x;
   },
   onPolicy(choice) {
     // Same seed, so the two policies can be compared on the same fire.
@@ -80,7 +87,7 @@ const panel = createPanel(panelRoot, {
 
 window.addEventListener("keydown", (e) => {
   if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLButtonElement) return;
-  if (e.code === "Space") loop.paused = !loop.paused;
+  if (e.code === "Space") session.loop.paused = !session.loop.paused;
   else if (e.code === "KeyN") {
     seed = 1 + Math.floor(Math.random() * 9999);
     restart();
@@ -93,13 +100,14 @@ let last = performance.now();
 view.renderer.setAnimationLoop((now: number) => {
   const dt = (now - last) / 1000;
   last = now;
-  loop.advance(dt);
+  session.advance(dt);
+  const { loop, history } = session;
   const { world } = loop.engine;
   terrain.update(world);
   fire.update(world.grid, now / 1000);
   robotView.update(world.robot, Math.min(dt, 0.25), now / 1000);
-  const badge = policyBadge(policyChoice, brain.lastMeta);
-  panel.update(world, lastDecision, {
+  const badge = policyBadge(policyChoice, history.last?.source ?? null);
+  panel.update(world, history.last, {
     seed,
     paused: loop.paused,
     ended: loop.engine.ended,
