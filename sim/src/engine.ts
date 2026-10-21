@@ -23,6 +23,8 @@ export type StepResult =
 export interface DecisionRecord {
   id: number;
   t: number;
+  /** World tick the request was made at. */
+  tick: number;
   reason: DecisionReason;
   answers: Answers;
 }
@@ -49,14 +51,17 @@ const EVENT_ORDER: readonly RobotEvent[] = [
 export class Engine {
   readonly world: World;
   readonly log: DecisionRecord[] = [];
+  readonly options: EngineOptions;
   private readonly maxTicks: number;
   private request: DecisionRequest | null = null;
+  private requestTick = 0;
   private started = false;
   private done = false;
   private lastId = 0;
   private nextDecisionTick = 0;
 
   constructor(opts: EngineOptions) {
+    this.options = opts;
     this.world = createWorld(opts.seed, opts);
     this.maxTicks = Math.round((opts.maxTime ?? SIM.MAX_TIME) / SIM.TICK);
   }
@@ -125,12 +130,13 @@ export class Engine {
       }
     }
 
-    this.log.push({ id: req.id, t: req.t, reason: req.reason, answers });
+    this.log.push({ id: req.id, t: req.t, tick: this.requestTick, reason: req.reason, answers });
     this.request = null;
   }
 
   private ask(reason: DecisionReason): StepResult {
     const context = buildContext(this.world, reason);
+    this.requestTick = this.world.tick;
     this.request = {
       id: ++this.lastId,
       unit: "R1",

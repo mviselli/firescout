@@ -52,6 +52,15 @@ export {
   uniformScoreAnswer,
 } from "./policies/baseline";
 export { IdlePolicy } from "./policies/idle";
+export {
+  type DecisionSource,
+  type RecordedDecision,
+  type Recording,
+  Replay,
+  ReplayDesyncError,
+  type ReplayHooks,
+  recordGame,
+} from "./replay";
 export { createRng, type Rng } from "./rng";
 export {
   type Agent,
