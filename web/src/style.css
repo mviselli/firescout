@@ -1,14 +1,68 @@
+/*
+ * FireScout night operations board.
+ *
+ * The 3D yard fills the window (the content layer). Three glass surfaces float over it, and
+ * nothing glass sits on glass: the top bar, the status card, and the unit board. The board is
+ * text-heavy, so its glass is the most opaque.
+ *
+ * One loud thing: the model's chosen option, in signal red. Pad yellow (the base pad in the
+ * scene) means only "a decision is being made".
+ */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --scene: #0f1418;
+  --glass: rgb(20 25 30 / 0.62);
+  --glass-strong: rgb(20 25 30 / 0.8);
+  --glass-solid: #161b20;
+  --glass-edge: rgb(255 255 255 / 0.1);
+  --glass-shine: rgb(255 255 255 / 0.07);
+  --glass-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  --ink: #e9eef2;
+  --ink-soft: #a9b4bc;
+  --ink-faint: #75818a;
+  --rule: rgb(255 255 255 / 0.1);
+  --fill: rgb(255 255 255 / 0.06);
+  --fill-hover: rgb(255 255 255 / 0.11);
+  --track: rgb(255 255 255 / 0.08);
+  --signal: #f0532f;
+  --water: #5cb8f0;
+  --foam: #cfd6d3;
+  --pad: #f2c33a;
+  --muted-bar: #7d8a93;
+  --on-ink: #11161a;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --scene: #a7b2b6;
+  --glass: rgb(242 244 241 / 0.62);
+  --glass-strong: rgb(242 244 241 / 0.82);
+  --glass-solid: #eef0ec;
+  --glass-edge: rgb(255 255 255 / 0.65);
+  --glass-shine: rgb(255 255 255 / 0.55);
+  --glass-shadow: 0 10px 30px rgb(30 34 37 / 0.18);
+  --ink: #1e2225;
+  --ink-soft: #4b5256;
+  --ink-faint: #7d8488;
+  --rule: rgb(30 34 37 / 0.12);
+  --fill: rgb(30 34 37 / 0.05);
+  --fill-hover: rgb(30 34 37 / 0.1);
+  --track: rgb(30 34 37 / 0.09);
+  --signal: #c4280e;
+  --water: #3e9fd6;
+  --foam: #ffffff;
+  --pad: #d9a514;
+  --muted-bar: #9aa09b;
+  --on-ink: #f3f5f2;
+}
+
 :root {
-  color-scheme: only light;
-  --haze: #a7b2b6;
-  --ink: #23272a;
-  --ink-soft: #4a5052;
-  --rule: #c9c4b8;
-  --card: rgb(236 233 225 / 0.94);
-  --fire: #c4280e;
-  --water: #5fb3e0;
-  --foam: #f6f6f2;
-  --muted-bar: #8f948f;
+  --gap: 12px;
+  --board-w: clamp(400px, 30vw, 500px);
+  --r-panel: 18px;
+  --r-bar: 14px;
+  --r-control: 10px;
 }
 
 html,
@@ -16,107 +70,141 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--haze);
+  background: var(--scene);
   color: var(--ink);
   font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
-/* The scene stops where the panel starts, so the panel never hides part of the site. */
 #stage {
   position: fixed;
-  inset: 0 336px 0 0;
+  inset: 0;
 }
 
 #stage canvas {
   display: block;
 }
 
-/* Panel: one quiet column on the right; the decision bars are its only loud element. */
+/* Glass: a blurred, tinted pane with a bright hairline edge and a soft lift off the scene. */
+#topbar,
+#status,
 #panel {
   position: fixed;
-  top: 16px;
-  right: 16px;
-  bottom: 16px;
-  width: 300px;
-  overflow-y: auto;
-  padding: 14px 18px 16px;
-  background: var(--card);
-  border-left: 4px solid var(--fire);
-  font-size: 17px;
-  line-height: 1.3;
-  font-variant-numeric: tabular-nums;
+  z-index: 1;
+  box-sizing: border-box;
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--glass-shine),
+    var(--glass-shadow);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
 }
 
-:where(#panel) h1 {
+#panel {
+  background: var(--glass-strong);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  #topbar,
+  #status,
+  #panel {
+    background: var(--glass-solid);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  #topbar,
+  #status,
+  #panel {
+    background: var(--glass-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+:where(#topbar, #status, #panel) :is(h1, h2, p, ol, ul) {
   margin: 0;
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  padding: 0;
 }
 
-:where(#panel) h2 {
-  margin: 0 0 4px;
-  font-size: 19px;
-  font-weight: 600;
+:where(#panel) :is(ol, ul) {
+  list-style: none;
 }
 
-:where(#panel) p {
-  margin: 0;
-}
-
-:where(#panel) section {
-  margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px solid var(--rule);
-}
-
-.fire-name,
-.wind,
-.keys,
-.decision-head,
-.empty {
-  color: var(--ink-soft);
-}
-
-.fire-row {
+/* Top bar: floats over the scene, stops short of the board. */
+#topbar {
+  top: var(--gap);
+  left: var(--gap);
+  right: calc(var(--board-w) + var(--gap) * 2);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 8px 24px;
+  padding: 8px 10px 8px 18px;
+  border-radius: var(--r-bar);
+  font-size: 18px;
 }
 
-:where(#panel) .policy-select {
-  padding: 2px 6px;
+.board-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
 }
 
-/* Who answered the last decision; the square takes the colour of its source. */
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+:where(#topbar) h1 {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.fire-name {
+  color: var(--ink-soft);
+  font-size: 19px;
+}
+
 .policy-badge {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-top: 4px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
-.policy-badge::before {
+.policy-badge::before,
+.source::before,
+.log-row::before {
   content: "";
   flex: none;
   width: 9px;
   height: 9px;
+  border-radius: 50%;
   background: var(--ink);
 }
 
-.policy-badge[data-tone="brain"]::before {
+.policy-badge[data-tone="brain"]::before,
+[data-tone="brain"].source::before,
+[data-tone="brain"].log-row::before {
   background: var(--water);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--water) 60%, transparent);
 }
 
 .policy-badge[data-tone="fallback"] {
-  color: var(--fire);
+  color: var(--signal);
 }
 
-.policy-badge[data-tone="fallback"]::before {
-  background: var(--fire);
+.policy-badge[data-tone="fallback"]::before,
+[data-tone="fallback"].source::before,
+[data-tone="fallback"].log-row::before {
+  background: var(--signal);
 }
 
 .policy-badge[data-tone="waiting"] {
@@ -128,180 +216,580 @@ body {
   box-shadow: inset 0 0 0 1.5px var(--ink-soft);
 }
 
-.clock {
-  margin-top: 10px;
-  font-size: 34px;
-  font-weight: 500;
-  line-height: 1.05;
-}
-
 .controls,
-.speeds {
+.actions,
+.tuning {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
-  margin-top: 10px;
 }
 
-:where(#panel) button,
-:where(#panel) select {
+.controls {
+  gap: 6px 16px;
+}
+
+/* Controls: soft filled pills on the glass, no hard borders. */
+:where(#topbar, #panel) :is(button, select) {
   font: inherit;
-  font-size: 16px;
+  font-size: 17px;
   color: var(--ink);
-  background: var(--foam);
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  padding: 4px 10px;
+  background: var(--fill);
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  padding: 5px 12px;
   cursor: pointer;
+  transition: background-color 0.12s;
 }
 
-:where(#panel) button:disabled {
-  opacity: 0.5;
+:where(#topbar, #panel) button:disabled {
+  opacity: 0.4;
   cursor: default;
 }
 
-:where(#panel) button:hover:not(:disabled),
-:where(#panel) select:hover {
-  border-color: var(--ink-soft);
+:where(#topbar, #panel) :is(button:hover:not(:disabled), select:hover) {
+  background: var(--fill-hover);
 }
 
-:where(#panel) button:focus-visible,
-:where(#panel) select:focus-visible {
-  outline: 2px solid var(--fire);
-  outline-offset: 1px;
+:where(#topbar, #panel) :is(button, select):focus-visible {
+  outline: 2px solid var(--water);
+  outline-offset: 2px;
 }
 
-.controls button {
-  flex: 1;
+:where(#topbar) select {
+  padding-right: 8px;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 32px;
+  padding: 0;
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Speed: one pill track, the chosen speed a raised chip inside it. */
+.speeds {
+  display: flex;
+  padding: 2px;
+  border-radius: var(--r-control);
+  background: var(--fill);
 }
 
 .speeds button {
-  flex: 1;
-  padding: 3px 0;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: transparent;
 }
 
 .speeds button[aria-pressed="true"] {
   background: var(--ink);
-  border-color: var(--ink);
-  color: var(--foam);
+  color: var(--on-ink);
 }
 
-.field {
+/* Status card: the clock, the fire's extent, and how the burned area grew. */
+#status {
+  left: var(--gap);
+  bottom: var(--gap);
+  min-width: 300px;
+  padding: 12px 18px 14px;
+  border-radius: var(--r-panel);
+}
+
+.readout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: end;
+  gap: 8px 22px;
+}
+
+.clock {
+  display: flex;
+  flex-direction: column;
+}
+
+.clock-t {
+  font-size: 44px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.clock-state {
+  min-height: 1.2em;
+  color: var(--ink-soft);
+  font-size: 17px;
+}
+
+.figures {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: var(--ink-soft);
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.figure b {
+  margin-right: 5px;
+  color: var(--ink);
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.spark-caption {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  color: var(--ink-faint);
+  font-size: 14px;
+}
+
+.spark {
+  grid-column: 1 / -1;
   display: block;
-  margin-top: 6px;
+  width: 100%;
+  height: 36px;
 }
 
-.field select {
-  width: 100%;
+.spark-area {
+  fill: color-mix(in srgb, var(--signal) 18%, transparent);
+}
+
+.spark-line {
+  fill: none;
+  stroke: var(--signal);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Unit board */
+#panel {
+  top: var(--gap);
+  right: var(--gap);
+  bottom: var(--gap);
+  width: var(--board-w);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 18px 22px 12px;
+  border-radius: var(--r-panel);
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+:where(#panel) > section + section {
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+/* The unit: a tag like the crew boards at a fire ground, then its tanks and its decision. */
+.unit-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  align-items: center;
+}
+
+.unit-tag {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 25px;
+  font-weight: 600;
+}
+
+:where(#panel) h2 {
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1.1;
 }
 
 .task {
-  margin-bottom: 6px;
+  color: var(--ink-soft);
+  font-size: 19px;
+}
+
+.tanks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 20px;
+  margin-top: 14px;
 }
 
 .tank {
   display: grid;
-  grid-template-columns: 48px 1fr 40px;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
+  grid-template-columns: 1fr auto;
+  font-size: 17px;
+}
+
+.tank-label {
+  color: var(--ink-soft);
 }
 
 .tank-track {
-  height: 8px;
-  background: rgb(35 39 42 / 0.12);
+  grid-column: 1 / -1;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
 }
 
 .tank-fill {
   display: block;
   height: 100%;
   width: calc(var(--p, 1) * 100%);
+  border-radius: inherit;
   background: var(--water);
 }
 
 .foam .tank-fill {
   background: var(--foam);
-  box-shadow: inset 0 0 0 1px var(--ink-soft);
 }
 
-.tank-value {
-  text-align: right;
+/* White foam on a pale track needs an edge in the light theme. */
+:root[data-theme="light"] .foam .tank-fill {
+  box-shadow: inset 0 0 0 1px var(--ink-faint);
 }
 
-.decision-t {
+.decision-error {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--signal) 14%, transparent);
+}
+
+.decision-error[hidden],
+.dv-pending[hidden] {
+  display: none;
+}
+
+/* Decision view */
+.dv {
+  position: relative;
+  margin-top: 16px;
+}
+
+/* Takes the place of the last answer's time line, so nothing below moves while the model thinks. */
+.dv-pending {
+  position: absolute;
+  inset: -2px 0 auto;
+  z-index: 1;
+  padding-bottom: 6px;
+  font-weight: 500;
+  overflow: hidden;
+}
+
+/* The pad-yellow line sweeps while the model thinks. */
+.dv-pending::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 35%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--pad);
+  animation: sweep 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes sweep {
+  to {
+    transform: translateX(186%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dv-pending::after {
+    width: 100%;
+    animation: none;
+  }
+}
+
+.dv-body {
+  transition: opacity 0.12s;
+}
+
+/* Dim only once the wait is noticeable, so quick answers don't make the card blink. */
+.dv[data-pending] .dv-body {
+  opacity: 0.6;
+  transition-delay: 0.15s;
+}
+
+.dv-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--ink-soft);
+}
+
+.dv-time {
   color: var(--ink);
   font-weight: 600;
 }
 
-.decision-error {
-  margin: 4px 0 6px;
-  padding: 6px 8px;
-  background: rgb(196 40 14 / 0.1);
-  border-left: 3px solid var(--fire);
-  color: var(--ink);
+.dv[data-pending] .dv-head {
+  visibility: hidden;
 }
 
-.decision-error[hidden] {
-  display: none;
+.source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  white-space: nowrap;
 }
 
-.question {
-  margin-top: 10px;
-}
-
-.question-label {
+.dv-q {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 12px 0 6px;
+  font-size: 20px;
   font-weight: 500;
-  margin-bottom: 2px;
+}
+
+.sure {
+  color: var(--ink-soft);
+  font-size: 17px;
+  font-weight: 400;
+  cursor: help;
+  text-decoration: underline dotted var(--ink-faint);
+  text-underline-offset: 3px;
 }
 
 .option {
   display: grid;
-  grid-template-columns: 88px 1fr 38px;
+  grid-template-columns: 112px 1fr 48px;
   align-items: center;
-  gap: 8px;
-  font-size: 16px;
+  gap: 10px;
+  min-height: 25px;
   color: var(--ink-soft);
+  font-size: 17px;
+}
+
+/* Every bar sits on a faint full-length track, so its length reads against 100%. */
+.track {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
 }
 
 .option .bar {
-  height: 10px;
+  display: block;
+  height: 100%;
   width: calc(var(--p, 0) * 100%);
-  min-width: 1px;
+  min-width: 3px;
+  border-radius: inherit;
   background: var(--muted-bar);
-}
-
-.option.chosen {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.option.chosen .bar {
-  background: var(--fire);
 }
 
 .pct {
   text-align: right;
 }
 
+/* The loud element: what the model chose, and how much it leaned on it. */
+.option.chosen {
+  min-height: 40px;
+  color: var(--ink);
+  font-size: 23px;
+  font-weight: 600;
+}
+
+.option.chosen .track {
+  height: 16px;
+}
+
+.option.chosen .bar {
+  background: var(--signal);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--signal) 45%, transparent);
+}
+
+.option.chosen .pct {
+  font-size: 26px;
+}
+
+.subs {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--rule);
+}
+
+.sub {
+  display: grid;
+  grid-template-columns: 1fr auto 64px 44px;
+  align-items: center;
+  gap: 10px;
+  min-height: 25px;
+  color: var(--ink-faint);
+  font-size: 17px;
+}
+
+.sub.acting {
+  color: var(--ink);
+}
+
+.sub-a {
+  font-weight: 600;
+}
+
+/* A split bar: the chosen agent's share of two. */
+.mini {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, currentcolor calc(var(--p, 0) * 100%), var(--track) 0);
+}
+
+.empty {
+  color: var(--ink-soft);
+}
+
+/* Radio log: both units' calls, newest first. */
+.log {
+  flex: 1 1 auto;
+  /* About four rows; below that the whole board scrolls instead. */
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.log-count {
+  color: var(--ink-soft);
+}
+
+.log-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 8px -10px 0;
+}
+
+:where(#panel) .log-row {
+  display: grid;
+  grid-template-columns: 9px 46px 26px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font-size: 17px;
+}
+
+:where(#panel) .log-row:hover {
+  background: var(--fill-hover);
+}
+
+.log-list li:first-child .log-row {
+  font-weight: 600;
+}
+
+.log-t,
+.log-unit,
+.log-conf {
+  color: var(--ink-soft);
+}
+
+.log-t {
+  text-align: right;
+}
+
+.log-what {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .keys {
-  margin-top: 14px;
+  margin-top: 10px;
+  color: var(--ink-faint);
   font-size: 15px;
 }
 
+/* Short screens: the radio log keeps its room; the key hints go. */
+@media (max-height: 760px) {
+  :where(#panel) > section + section {
+    padding-top: 10px;
+    margin-top: 10px;
+  }
+
+  .keys {
+    display: none;
+  }
+}
+
+/* Phones: the scene on top, the panels stacked under it as solid cards. */
 @media (max-width: 640px) {
+  html,
+  body {
+    overflow: auto;
+    height: auto;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+    padding-bottom: var(--gap);
+  }
+
   #stage {
-    inset: 0 0 45vh;
+    position: relative;
+    order: 1;
+    height: 48vh;
+  }
+
+  #topbar,
+  #status,
+  #panel {
+    position: static;
+    width: auto;
+    margin-inline: var(--gap);
+    background: var(--glass-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  #topbar {
+    order: 0;
+    margin-top: var(--gap);
+  }
+
+  #status {
+    order: 2;
   }
 
   #panel {
-    top: auto;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: auto;
-    max-height: 45vh;
-    padding: 12px 16px;
-    border-left: 0;
-    border-top: 4px solid var(--fire);
+    order: 3;
+    overflow: visible;
+  }
+
+  .log-list {
+    overflow: visible;
   }
 
   .keys {

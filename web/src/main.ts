@@ -7,10 +7,20 @@ import { createRobotView } from "./scene/robot";
 import { createTerrain } from "./scene/terrain";
 import { createView } from "./scene/view";
 import { LiveSession } from "./session";
+import { applyTheme, loadTheme, saveTheme, type Theme } from "./theme";
 
-const stage = document.getElementById("stage") as HTMLElement;
-const panelRoot = document.getElementById("panel") as HTMLElement;
+const byId = (id: string) => document.getElementById(id) as HTMLElement;
+const stage = byId("stage");
 const view = createView(stage);
+let theme: Theme = loadTheme();
+
+function setTheme(next: Theme): void {
+  theme = next;
+  applyTheme(theme);
+  view.setTheme(theme);
+  saveTheme(theme);
+}
+setTheme(theme);
 const baseline = new BaselinePolicy();
 // One brain connection for the page's lifetime; it falls back to the rules while the brain is away.
 const brain = new RemotePolicy({
@@ -61,29 +71,62 @@ function restart(): void {
   session = newSession();
 }
 
-const panel = createPanel(panelRoot, {
-  onPause() {
-    session.loop.paused = !session.loop.paused;
+const panel = createPanel(
+  { top: byId("topbar"), status: byId("status"), board: byId("panel") },
+  {
+    onTheme() {
+      setTheme(theme === "dark" ? "light" : "dark");
+    },
+    onPause() {
+      session.loop.paused = !session.loop.paused;
+    },
+    onNewSeed() {
+      // Only the sim must be deterministic; picking the next seed is a UI choice.
+      seed = 1 + Math.floor(Math.random() * 9999);
+      restart();
+    },
+    onWind(dirDeg) {
+      windFromDeg = dirDeg;
+      restart();
+    },
+    onSpeed(x) {
+      speed = x;
+      session.loop.speed = x;
+    },
+    onOpenDecision(index) {
+      // The details drawer arrives with the timeline (Task 6).
+      console.info("open decision", session.history.entries[index]?.req.id);
+    },
+    onPolicy(choice) {
+      // Same seed, so the two policies can be compared on the same fire.
+      policyChoice = choice;
+      restart();
+    },
   },
-  onNewSeed() {
-    // Only the sim must be deterministic; picking the next seed is a UI choice.
-    seed = 1 + Math.floor(Math.random() * 9999);
-    restart();
-  },
-  onWind(dirDeg) {
-    windFromDeg = dirDeg;
-    restart();
-  },
-  onSpeed(x) {
-    speed = x;
-    session.loop.speed = x;
-  },
-  onPolicy(choice) {
-    // Same seed, so the two policies can be compared on the same fire.
-    policyChoice = choice;
-    restart();
-  },
-});
+);
+
+/** Frame the yard in the part of the scene the floating panels leave free. */
+function fitToPanels(): void {
+  const r = (id: string) => byId(id).getBoundingClientRect();
+  const stageRect = stage.getBoundingClientRect();
+  // On phones the panels stack below the scene instead of floating over it.
+  const floating = getComputedStyle(byId("panel")).position === "fixed";
+  view.setInsets(
+    floating
+      ? {
+          top: r("topbar").bottom - stageRect.top,
+          right: stageRect.right - r("panel").left,
+          // The status card sits in the yard's empty bottom-left corner, so it needs no room.
+          bottom: 0,
+          left: 0,
+        }
+      : { top: 0, right: 0, bottom: 0, left: 0 },
+  );
+}
+const panelsObserver = new ResizeObserver(fitToPanels);
+for (const id of ["topbar", "status", "panel"]) panelsObserver.observe(byId(id));
+panelsObserver.observe(document.body);
+fitToPanels();
 
 window.addEventListener("keydown", (e) => {
   if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLButtonElement) return;
@@ -92,6 +135,7 @@ window.addEventListener("keydown", (e) => {
     seed = 1 + Math.floor(Math.random() * 9999);
     restart();
   } else if (e.code === "KeyC") view.resetCamera();
+  else if (e.code === "KeyT") setTheme(theme === "dark" ? "light" : "dark");
   else return;
   e.preventDefault();
 });
@@ -107,7 +151,7 @@ view.renderer.setAnimationLoop((now: number) => {
   fire.update(world.grid, now / 1000);
   robotView.update(world.robot, Math.min(dt, 0.25), now / 1000);
   const badge = policyBadge(policyChoice, history.last?.source ?? null);
-  panel.update(world, history.last, {
+  panel.update(world, history, {
     seed,
     paused: loop.paused,
     ended: loop.engine.ended,
@@ -116,6 +160,9 @@ view.renderer.setAnimationLoop((now: number) => {
     policyChoice,
     policy: badge.text,
     policyTone: badge.tone,
+    pending: loop.waiting ? loop.engine.pending : null,
+    upTo: history.entries.length,
+    theme,
     ...(badge.detail === undefined ? {} : { policyDetail: badge.detail }),
   });
   view.render();

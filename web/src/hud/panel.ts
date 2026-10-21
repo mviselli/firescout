@@ -1,6 +1,4 @@
 import {
-  type Answer,
-  type Answers,
   CellState,
   type DecisionRequest,
   get,
@@ -9,6 +7,12 @@ import {
   simTime,
   type World,
 } from "@firescout/sim";
+import type { GameHistory } from "../history";
+import type { Theme } from "../theme";
+import { createDecisionView } from "./decision-view";
+import { el, setText } from "./dom";
+import { entryChosenP, entrySummary, percent, sourceLabel, sourceTone } from "./labels";
+import { sparkPath, sparkTop } from "./spark";
 
 export interface PanelHandlers {
   onPause(): void;
@@ -17,17 +21,18 @@ export interface PanelHandlers {
   onWind(dirDeg: number | null): void;
   onSpeed(x: number): void;
   onPolicy(policy: PolicyChoice): void;
+  onTheme(): void;
+  /** A log row was clicked: the index into the history's entries. */
+  onOpenDecision(index: number): void;
+  /** Missing until replay is wired; the button is then disabled. */
+  onReplay?(): void;
+  onOpenFile?(file: File): void;
 }
 
 export type PolicyChoice = "brain" | "baseline";
 
 /** Who answered the last decision: the brain, the fallback rules, the chosen rules, or nobody yet. */
 export type PolicyTone = "brain" | "fallback" | "rules" | "waiting";
-
-export interface LastDecision {
-  req: DecisionRequest;
-  answers: Answers;
-}
 
 export interface PanelStatus {
   seed: number;
@@ -42,10 +47,15 @@ export interface PanelStatus {
   policyTone: PolicyTone;
   /** Why the brain was not used for the last decision (badge tooltip). */
   policyDetail?: string;
+  /** The request in flight, if any. */
+  pending: DecisionRequest | null;
+  /** Entries [0, upTo) are shown: all of them live, those up to the playhead in a replay. */
+  upTo: number;
+  theme: Theme;
 }
 
 export interface Panel {
-  update(world: World, lastDecision: LastDecision | null, status: PanelStatus): void;
+  update(world: World, history: GameHistory, status: PanelStatus): void;
 }
 
 const WIND_FROM = [
@@ -58,24 +68,15 @@ const WIND_FROM = [
   "west",
   "north-west",
 ];
+const WIND_SHORT = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 const SPEEDS = [0.5, 1, 2, 4];
+/** The log scrolls, so it can hold a good stretch of the game. */
+const LOG_ROWS = 40;
 
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  className?: string,
-  text?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-/** Bearing (0 = north) the wind blows from, given the direction it blows toward. */
-function windFrom(world: World): string {
+/** Index (0 = north, clockwise in 45° steps) of the bearing the wind blows from. */
+function windFromIndex(world: World): number {
   const toward = (Math.atan2(world.wind.dx, -world.wind.dy) * 180) / Math.PI;
-  const from = WIND_FROM[(Math.round(toward / 45) + 4 + 8) % 8];
-  return `From the ${from}, ${world.wind.speedKmh} km/h`;
+  return (Math.round(toward / 45) + 4 + 8) % 8;
 }
 
 function taskLabel(world: World): string {
@@ -88,94 +89,64 @@ function taskLabel(world: World): string {
   return "Holding position";
 }
 
-function questionLabel(id: string, req: DecisionRequest): string {
-  if (id === "action") return "Next move";
-  if (id === "door_safe") return `Is door ${req.context.door?.id ?? ""} safe to open?`;
-  if (id.startsWith("agent_")) return `Agent for ${id.slice("agent_".length)}`;
-  return id;
-}
-
-function optionLabel(label: string): string {
-  if (label.startsWith("attack_")) return `Attack ${label.slice("attack_".length)}`;
-  if (label === "wait") return "Hold";
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-const REASONS: Record<string, string> = {
-  start: "first call",
-  cadence: "routine check",
-  door: "closed door ahead",
-  tank_empty: "tank empty",
-  blocked: "path blocked",
-  task_done: "sector put out",
-  refilled: "tanks full",
-};
-
-/** Top-3 options as bars; the chosen one is highlighted. */
-function answerRows(a: Answer): { label: string; p: number; chosen: boolean }[] {
-  if (a.type === "noul") {
-    const yes = a.noul >= 0.5;
-    return [
-      { label: "Yes", p: a.noul, chosen: yes },
-      { label: "No", p: 1 - a.noul, chosen: !yes },
-    ];
-  }
-  const chosen = a.type === "choice" ? a.choice : null;
-  return Object.entries(a.probabilities)
-    .sort((x, y) => y[1] - x[1])
-    .slice(0, 3)
-    .map(([label, p]) => ({ label: optionLabel(label), p, chosen: label === chosen }));
-}
-
-function renderDecision(box: HTMLElement, d: LastDecision): void {
-  box.replaceChildren();
-  const head = el("p", "decision-head");
-  head.append(
-    el("span", "decision-t", `${d.req.t.toFixed(1)} s`),
-    el("span", "", ` R1, ${REASONS[d.req.reason] ?? d.req.reason}`),
-  );
-  box.append(head);
-  for (const [id, a] of Object.entries(d.answers)) {
-    const q = el("div", "question");
-    q.append(el("p", "question-label", questionLabel(id, d.req)));
-    for (const row of answerRows(a)) {
-      const r = el("div", row.chosen ? "option chosen" : "option");
-      const bar = el("span", "bar");
-      bar.style.setProperty("--p", row.p.toFixed(3));
-      r.append(
-        el("span", "option-label", row.label),
-        bar,
-        el("span", "pct", `${Math.round(row.p * 100)}%`),
-      );
-      q.append(r);
-    }
-    box.append(q);
-  }
-}
-
 function tank(label: string, kind: string): { root: HTMLElement; set(v: number): void } {
   const root = el("div", `tank ${kind}`);
   const fill = el("span", "tank-fill");
   const value = el("span", "tank-value");
   const track = el("span", "tank-track");
   track.append(fill);
-  root.append(el("span", "tank-label", label), track, value);
+  root.append(el("span", "tank-label", label), value, track);
   return {
     root,
     set(v) {
       fill.style.setProperty("--p", (v / 100).toFixed(3));
-      value.textContent = `${Math.round(v)}%`;
+      setText(value, `${Math.round(v)}%`);
     },
   };
 }
 
-export function createPanel(root: HTMLElement, handlers: PanelHandlers): Panel {
-  root.replaceChildren();
+/** One big figure with a small word after it: "4% burned". */
+function figure(word: string): {
+  root: HTMLElement;
+  set(value: string): void;
+  setWord(word: string): void;
+} {
+  const root = el("p", "figure");
+  const value = el("b");
+  const label = el("span", "", word);
+  root.append(value, label);
+  return { root, set: (v) => setText(value, v), setWord: (w) => setText(label, w) };
+}
 
-  const header = el("header", "panel-head");
-  const title = el("h1", "", "FireScout");
-  const fireRow = el("div", "fire-row");
+function button(text: string, onClick: () => void): HTMLButtonElement {
+  const b = el("button", "", text);
+  b.type = "button";
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+/** Where the HUD lives: the top bar, the status card over the scene, and the unit board. */
+export interface PanelRoots {
+  top: HTMLElement;
+  status: HTMLElement;
+  board: HTMLElement;
+}
+
+/** Sun and moon, drawn on a 20-unit grid; the button shows the theme it switches to. */
+const SUN =
+  '<circle cx="10" cy="10" r="3.6"/><path d="M10 1.5v2.4M10 16.1v2.4M1.5 10h2.4M16.1 10h2.4M4 4l1.7 1.7M14.3 14.3 16 16M4 16l1.7-1.7M14.3 5.7 16 4"/>';
+const MOON = '<path d="M16.5 12.6A7 7 0 0 1 7.4 3.5a7 7 0 1 0 9.1 9.1Z"/>';
+
+const SPARK_W = 220;
+const SPARK_H = 36;
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
+  // Header: name, fire, who decides, and who answered last.
+  const header = el("div", "board-head");
+  const brand = el("div", "brand");
   const fireName = el("p", "fire-name");
+  brand.append(el("h1", "", "FireScout"), fireName);
   const policySelect = el("select", "policy-select");
   policySelect.setAttribute("aria-label", "Who decides for R1");
   for (const [value, label] of [
@@ -189,108 +160,215 @@ export function createPanel(root: HTMLElement, handlers: PanelHandlers): Panel {
   policySelect.addEventListener("change", () =>
     handlers.onPolicy(policySelect.value === "baseline" ? "baseline" : "brain"),
   );
-  fireRow.append(fireName, policySelect);
   const badge = el("p", "policy-badge");
   badge.setAttribute("aria-live", "polite");
-  header.append(title, fireRow, badge);
+  header.append(brand, policySelect, badge);
 
-  const clock = el("p", "clock");
-  const stats = el("p", "stats");
-  const wind = el("p", "wind");
+  // Readout: the clock and the fire's extent.
+  const readout = el("div", "readout");
+  const clockRow = el("p", "clock");
+  const clock = el("span", "clock-t");
+  const clockState = el("span", "clock-state");
+  clockRow.append(clock, clockState);
+  const burned = figure("burned");
+  const burning = figure("on fire");
+  const wind = figure("");
+  wind.root.classList.add("wind");
+  const figures = el("div", "figures");
+  figures.append(burned.root, burning.root, wind.root);
+  // How much of the site has burned so far, over the game.
+  const spark = document.createElementNS(SVG_NS, "svg");
+  spark.classList.add("spark");
+  spark.setAttribute("viewBox", `0 0 ${SPARK_W} ${SPARK_H}`);
+  spark.setAttribute("preserveAspectRatio", "none");
+  spark.setAttribute("role", "img");
+  spark.setAttribute("aria-label", "Burned area over time");
+  const sparkArea = document.createElementNS(SVG_NS, "path");
+  sparkArea.classList.add("spark-area");
+  const sparkLine = document.createElementNS(SVG_NS, "path");
+  sparkLine.classList.add("spark-line");
+  spark.append(sparkArea, sparkLine);
+  const sparkCaption = el("p", "spark-caption");
+  readout.append(clockRow, figures, sparkCaption, spark);
 
+  // Controls.
   const controls = el("div", "controls");
-  const pause = el("button", "", "Pause");
-  pause.type = "button";
-  pause.addEventListener("click", () => handlers.onPause());
-  const newFire = el("button", "", "New fire");
-  newFire.type = "button";
-  newFire.addEventListener("click", () => handlers.onNewSeed());
-  controls.append(pause, newFire);
+  const pause = button("Pause", () => handlers.onPause());
+  const newFire = button("New fire", () => handlers.onNewSeed());
+  const replay = button("Replay", () => handlers.onReplay?.());
+  replay.disabled = handlers.onReplay === undefined;
+  const fileInput = el("input");
+  fileInput.type = "file";
+  fileInput.accept = ".json,application/json";
+  fileInput.hidden = true;
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    if (file) handlers.onOpenFile?.(file);
+    fileInput.value = "";
+  });
+  const theme = button("", () => handlers.onTheme());
+  theme.classList.add("icon-button");
+  const themeIcon = document.createElementNS(SVG_NS, "svg");
+  themeIcon.setAttribute("viewBox", "0 0 20 20");
+  themeIcon.setAttribute("aria-hidden", "true");
+  theme.append(themeIcon);
+  let shownTheme = "";
+  const open = button("Open…", () => fileInput.click());
+  open.title = "Open a saved replay";
+  open.disabled = handlers.onOpenFile === undefined;
+  const actions = el("div", "actions");
+  actions.append(pause, newFire, replay, open, fileInput);
 
-  const windField = el("label", "field");
-  const windSelect = el("select");
-  windSelect.append(el("option", "", "Wind from the seed"));
+  const windSelect = el("select", "wind-select");
+  windSelect.setAttribute("aria-label", "Wind");
+  windSelect.title = "Where the wind blows from";
+  windSelect.append(el("option", "", "Wind: seed"));
   windSelect.options[0]?.setAttribute("value", "");
   WIND_FROM.forEach((name, k) => {
-    const o = el("option", "", `Wind from the ${name}`);
+    const o = el("option", "", `Wind: ${WIND_SHORT[k]}`);
     o.value = String(k * 45);
+    o.title = `Wind from the ${name}`;
     windSelect.append(o);
   });
   windSelect.addEventListener("change", () =>
     handlers.onWind(windSelect.value === "" ? null : Number(windSelect.value)),
   );
-  windField.append(windSelect);
-
   const speedGroup = el("div", "speeds");
   speedGroup.setAttribute("role", "group");
   speedGroup.setAttribute("aria-label", "Speed");
   const speedButtons = SPEEDS.map((x) => {
-    const b = el("button", "", `${x}×`);
-    b.type = "button";
-    b.addEventListener("click", () => handlers.onSpeed(x));
+    const b = button(`${x}×`, () => handlers.onSpeed(x));
     speedGroup.append(b);
     return { x, b };
   });
+  const tuning = el("div", "tuning");
+  tuning.append(windSelect, speedGroup, theme);
+  controls.append(actions, tuning);
 
+  // The unit: its tag, what it is doing, its tanks, and its decision.
   const unit = el("section", "unit");
-  const unitName = el("h2", "", "R1 ground robot");
+  unit.setAttribute("aria-label", "R1 ground robot");
+  const unitHead = el("header", "unit-head");
   const task = el("p", "task");
+  unitHead.append(el("span", "unit-tag", "R1"), el("h2", "", "Ground robot"), task);
   const water = tank("Water", "water");
   const foam = tank("Foam", "foam");
-  unit.append(unitName, task, water.root, foam.root);
-
-  const decision = el("section", "decision");
-  decision.setAttribute("aria-live", "polite");
-  const decisionTitle = el("h2", "", "Last decision");
+  const tanks = el("div", "tanks");
+  tanks.append(water.root, foam.root);
   const decisionError = el("p", "decision-error");
   decisionError.setAttribute("role", "alert");
   decisionError.hidden = true;
-  const decisionBody = el("div", "decision-body");
-  decisionBody.append(el("p", "empty", "Waiting for R1's first call."));
-  decision.append(decisionTitle, decisionError, decisionBody);
+  const decision = createDecisionView();
+  decision.root.setAttribute("aria-live", "polite");
+  unit.append(unitHead, tanks, decisionError, decision.root);
 
-  const keys = el("p", "keys", "Space pauses, N starts a new fire, C resets the camera.");
+  // Radio log: the latest decisions, newest first.
+  const log = el("section", "log");
+  const logHead = el("header", "log-head");
+  const logCount = el("span", "log-count");
+  logHead.append(el("h2", "", "Radio log"), logCount);
+  const logList = el("ol", "log-list");
+  log.append(logHead, logList);
 
-  root.append(header, clock, stats, wind, controls, windField, speedGroup, unit, decision, keys);
+  const keys = el(
+    "p",
+    "keys",
+    "Space pauses, N starts a new fire, C resets the camera, T switches the theme.",
+  );
 
-  let shownDecision: LastDecision | null = null;
+  roots.top.replaceChildren(header, controls);
+  roots.status.replaceChildren(readout);
+  roots.board.replaceChildren(unit, log, keys);
+
+  let shownKey = "";
+  let shownSamples = -1;
+
+  function renderLog(history: GameHistory, upTo: number): void {
+    const rows: HTMLElement[] = [];
+    for (let k = upTo - 1; k >= Math.max(0, upTo - LOG_ROWS); k--) {
+      const entry = history.entries[k];
+      if (!entry) continue;
+      const b = el("button", "log-row");
+      b.type = "button";
+      b.dataset.tone = sourceTone(entry.source);
+      b.title = `${sourceLabel(entry.source)}. Open the details.`;
+      b.append(
+        el("span", "log-t", entry.req.t.toFixed(1)),
+        el("span", "log-unit", entry.req.unit),
+        el("span", "log-what", entrySummary(entry)),
+        el("span", "log-conf", percent(entryChosenP(entry))),
+      );
+      b.addEventListener("click", () => handlers.onOpenDecision(k));
+      const li = el("li");
+      li.append(b);
+      rows.push(li);
+    }
+    if (rows.length === 0) {
+      const li = el("li", "empty", "No calls yet.");
+      rows.push(li);
+    }
+    logList.replaceChildren(...rows);
+    setText(logCount, upTo === 1 ? "1 call" : `${upTo} calls`);
+  }
 
   return {
-    update(world, lastDecision, status) {
-      fireName.textContent = `Fire ${status.seed}`;
+    update(world, history, status) {
+      setText(fireName, `Fire ${status.seed}`);
       if (policySelect.value !== status.policyChoice) policySelect.value = status.policyChoice;
-      if (badge.textContent !== status.policy) badge.textContent = status.policy;
+      setText(badge, status.policy);
       badge.dataset.tone = status.policyTone;
       badge.title = status.policyDetail ?? "";
-      const t = simTime(world);
-      clock.textContent = status.ended
-        ? `Over at ${t.toFixed(1)} s`
-        : `${t.toFixed(1)} s${status.paused ? ", paused" : ""}`;
 
-      let burning = 0;
-      for (let i = 0; i < N; i++) if (get(world.grid.state, i) === CellState.Burning) burning++;
-      const burned = Math.round((1 - savedFraction(world)) * 100);
-      stats.textContent = `${burned}% of the site burned, ${burning} ${burning === 1 ? "cell" : "cells"} on fire`;
-      wind.textContent = windFrom(world);
+      setText(clock, `${simTime(world).toFixed(1)} s`);
+      setText(clockState, status.ended ? "Over" : status.paused ? "Paused" : "");
+      let cells = 0;
+      for (let i = 0; i < N; i++) if (get(world.grid.state, i) === CellState.Burning) cells++;
+      burned.set(`${Math.round((1 - savedFraction(world)) * 100)}%`);
+      burning.set(String(cells));
+      const w = windFromIndex(world);
+      wind.set(`${world.wind.speedKmh} km/h`);
+      wind.setWord(`from ${WIND_SHORT[w]}`);
+      wind.root.title = `Wind from the ${WIND_FROM[w]}`;
 
-      pause.textContent = status.paused ? "Resume" : "Pause";
+      if (history.samples.length !== shownSamples) {
+        shownSamples = history.samples.length;
+        const top = sparkTop(history.samples);
+        setText(sparkCaption, `Burned area over time, up to ${top}%`);
+        const line = sparkPath(history.samples, SPARK_W, SPARK_H, top);
+        sparkLine.setAttribute("d", line);
+        sparkArea.setAttribute("d", line ? `${line}L${SPARK_W},${SPARK_H}L0,${SPARK_H}Z` : "");
+      }
+
+      if (status.theme !== shownTheme) {
+        shownTheme = status.theme;
+        const next = status.theme === "dark" ? "light" : "dark";
+        themeIcon.innerHTML = next === "light" ? SUN : MOON;
+        theme.title = `Switch to the ${next} theme (T)`;
+        theme.setAttribute("aria-label", `Switch to the ${next} theme`);
+      }
+      setText(pause, status.paused ? "Resume" : "Pause");
       pause.disabled = status.ended;
       for (const { x, b } of speedButtons)
         b.setAttribute("aria-pressed", String(x === status.speed));
 
-      task.textContent = taskLabel(world);
+      setText(task, taskLabel(world));
       water.set(world.robot.water);
       foam.set(world.robot.foam);
 
       decisionError.hidden = status.error === null;
-      decisionError.textContent = status.error
-        ? `The game is waiting: R1's decision failed (${status.error}). Asking again shortly.`
-        : "";
+      setText(
+        decisionError,
+        status.error
+          ? `The game is waiting: R1's decision failed (${status.error}). Asking again shortly.`
+          : "",
+      );
 
-      if (lastDecision !== shownDecision) {
-        shownDecision = lastDecision;
-        if (lastDecision) renderDecision(decisionBody, lastDecision);
-        else decisionBody.replaceChildren(el("p", "empty", "Waiting for R1's first call."));
+      // Redraw the decision and the log only when a decision lands or one starts.
+      const key = `${history.entries.length}|${status.upTo}|${status.pending?.id ?? ""}`;
+      if (key !== shownKey) {
+        shownKey = key;
+        decision.show(history.entries[status.upTo - 1] ?? null, status.pending);
+        renderLog(history, status.upTo);
       }
     },
   };

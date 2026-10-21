@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="only light" />
-    <!-- The scene has its own palette; ask Dark Reader not to recolour it. -->
+    <meta name="color-scheme" content="dark light" />
+    <!-- FireScout has its own dark and light themes; ask Dark Reader not to recolour them. -->
     <meta name="darkreader-lock" />
     <title>FireScout</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,8 +16,10 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
+    <header id="topbar"></header>
     <div id="stage"></div>
-    <aside id="panel" aria-label="Game status and controls"></aside>
+    <section id="status" aria-label="Game status"></section>
+    <aside id="panel" aria-label="Units and their decisions"></aside>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
