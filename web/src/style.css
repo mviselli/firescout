@@ -230,7 +230,7 @@ body {
 }
 
 /* Controls: soft filled pills on the glass, no hard borders. */
-:where(#topbar, #panel) :is(button, select) {
+:where(#topbar, #panel, #details) :is(button, select) {
   font: inherit;
   font-size: 17px;
   color: var(--ink);
@@ -242,16 +242,16 @@ body {
   transition: background-color 0.12s;
 }
 
-:where(#topbar, #panel) button:disabled {
+:where(#topbar, #panel, #details) button:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-:where(#topbar, #panel) :is(button:hover:not(:disabled), select:hover) {
+:where(#topbar, #panel, #details) :is(button:hover:not(:disabled), select:hover) {
   background: var(--fill-hover);
 }
 
-:where(#topbar, #panel) :is(button, select):focus-visible {
+:where(#topbar, #panel, #details) :is(button, select):focus-visible {
   outline: 2px solid var(--water);
   outline-offset: 2px;
 }
@@ -297,18 +297,25 @@ body {
   color: var(--on-ink);
 }
 
-/* Status card: the clock, the fire's extent, and how the burned area grew. */
+/* Status card: the clock and the fire's extent, then the game's timeline across the scene's foot. */
 #status {
   left: var(--gap);
+  right: calc(var(--board-w) + var(--gap) * 2);
   bottom: var(--gap);
-  min-width: 300px;
-  padding: 12px 18px 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 22px;
+  padding: 10px 14px 8px 18px;
   border-radius: var(--r-panel);
 }
 
+/* Fixed width, so the timeline beside it doesn't shift as the clock gains digits. */
 .readout {
+  width: 250px;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto auto;
+  justify-content: start;
   align-items: end;
   gap: 8px 22px;
 }
@@ -347,29 +354,129 @@ body {
   font-weight: 600;
 }
 
-.spark-caption {
-  grid-column: 1 / -1;
-  margin-top: 4px;
-  color: var(--ink-faint);
-  font-size: 14px;
+/* Timeline: the burned area behind, one stem per decision (height = how sure), the playhead. */
+#timeline {
+  position: relative;
+  min-width: 0;
+  height: 88px;
 }
 
-.spark {
-  grid-column: 1 / -1;
+.tl {
   display: block;
   width: 100%;
-  height: 36px;
+  height: 88px;
+  overflow: visible;
+  touch-action: none;
+  user-select: none;
 }
 
-.spark-area {
-  fill: color-mix(in srgb, var(--signal) 18%, transparent);
+.tl[data-cursor="pointer"] {
+  cursor: pointer;
 }
 
-.spark-line {
+.tl[data-cursor="grab"] {
+  cursor: ew-resize;
+}
+
+.tl-burn {
+  fill: color-mix(in srgb, var(--signal) 16%, transparent);
+}
+
+.tl-burn-edge {
   fill: none;
-  stroke: var(--signal);
+  stroke: color-mix(in srgb, var(--signal) 70%, transparent);
   stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
+}
+
+.tl-scale,
+.tl-time {
+  fill: var(--ink-faint);
+  font-size: 13px;
+}
+
+.tl-tick {
+  stroke: var(--rule);
+  stroke-dasharray: 2 3;
+}
+
+.tl-base {
+  stroke: var(--rule);
+}
+
+.tl-mark line {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.tl-mark[data-tone="brain"] line {
+  stroke: var(--water);
+}
+
+.tl-mark[data-tone="fallback"] line {
+  stroke: var(--signal);
+}
+
+.tl-door {
+  fill: var(--scene);
+  stroke: var(--ink);
+  stroke-width: 1.6;
+}
+
+.tl-mark[data-tone="brain"] .tl-door {
+  stroke: var(--water);
+}
+
+.tl-mark[data-tone="fallback"] .tl-door {
+  stroke: var(--signal);
+}
+
+/* Replay: the calls still to come are faint until the playhead passes them. */
+.tl-mark.ahead {
+  opacity: 0.32;
+}
+
+.tl-selected {
+  fill: var(--fill-hover);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.tl-head-line {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.tl-knob {
+  fill: var(--ink);
+}
+
+/* Only a replay can be scrubbed, so only there the knob reads as a handle. */
+.tl:not([data-replay]) .tl-knob {
+  r: 2.5px;
+}
+
+.tl-ghost {
+  stroke: var(--ink-soft);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+
+.tl-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tl-tip[hidden] {
+  display: none;
 }
 
 /* Unit board */
@@ -730,6 +837,196 @@ body {
   font-size: 15px;
 }
 
+/* Details drawer: opened from a mark or a log row, it sits between the top bar and the status card. */
+#details {
+  position: fixed;
+  z-index: 2;
+  top: calc(var(--inset-top, 64px) + var(--gap));
+  bottom: calc(var(--inset-bottom, 120px) + var(--gap));
+  left: var(--gap);
+  width: 400px;
+  max-width: calc(100vw - var(--gap) * 2);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-panel);
+  background: var(--glass-strong);
+  box-shadow:
+    inset 0 1px 0 var(--glass-shine),
+    var(--glass-shadow);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  font-size: 17px;
+  line-height: 1.25;
+  outline: none;
+  animation: drawer-in 0.16s ease-out;
+}
+
+#details[hidden] {
+  display: none;
+}
+
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #details {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  #details {
+    background: var(--glass-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+:where(#details) :is(h2, h3, p, ol, pre) {
+  margin: 0;
+  padding: 0;
+}
+
+:where(#details) ol {
+  list-style: none;
+}
+
+.dt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 10px 20px;
+}
+
+.dt-title {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.dt-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 20px 12px;
+}
+
+.dt-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-soft);
+}
+
+.dt-fallback {
+  margin-top: 6px;
+  color: var(--signal);
+}
+
+:where(#details) h3 {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.dt-read,
+.dt-q {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+
+/* The state exactly as the model got it, so it reads as input, not as HUD copy. */
+.dt-state {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-control);
+  background: var(--fill);
+  color: var(--ink);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dt-q-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dt-scores {
+  display: flex;
+  gap: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.dt-ask {
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.dt-options {
+  margin-top: 8px;
+}
+
+.dt-option {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 10px;
+  padding: 6px 0;
+  color: var(--ink-soft);
+}
+
+.dt-track {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.dt-bar {
+  display: block;
+  height: 100%;
+  width: calc(var(--p, 0) * 100%);
+  min-width: 3px;
+  border-radius: inherit;
+  background: var(--muted-bar);
+}
+
+.dt-option.chosen {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.dt-option.chosen .dt-bar {
+  background: var(--signal);
+}
+
+.dt-desc {
+  grid-column: 1 / -1;
+  color: var(--ink-faint);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.dt-foot {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--rule);
+}
+
 /* Short screens: the radio log keeps its room; the key hints go. */
 @media (max-height: 760px) {
   :where(#panel) > section + section {
@@ -781,6 +1078,19 @@ body {
 
   #status {
     order: 2;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  #details {
+    inset: auto 0 0;
+    width: auto;
+    max-width: none;
+    max-height: 85vh;
+    border-radius: var(--r-panel) var(--r-panel) 0 0;
+    background: var(--glass-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   #panel {

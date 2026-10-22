@@ -1,7 +1,15 @@
 import { RemotePolicy } from "@firescout/brain-client";
-import { BaselinePolicy, type DecisionSource, type Policy, type Wind } from "@firescout/sim";
+import {
+  BaselinePolicy,
+  type DecisionSource,
+  type Policy,
+  simTime,
+  type Wind,
+} from "@firescout/sim";
 import { policyBadge, sourceFromMeta } from "./hud/badge";
+import { createDetails } from "./hud/details";
 import { createPanel, type PolicyChoice } from "./hud/panel";
+import { createTimeline } from "./hud/timeline";
 import { createFire } from "./scene/fire";
 import { createRobotView } from "./scene/robot";
 import { createTerrain } from "./scene/terrain";
@@ -65,14 +73,23 @@ function newSession(): LiveSession {
   });
 }
 
+/** The decision open in the details drawer, as an index into the history. */
+let selected: number | null = null;
+
 function restart(): void {
   // The old session's in-flight answer, if any, is dropped with it.
   session.dispose();
   session = newSession();
+  selected = null;
+}
+
+function select(index: number | null): void {
+  const count = session.history.entries.length;
+  selected = index === null || count === 0 ? null : Math.min(Math.max(index, 0), count - 1);
 }
 
 const panel = createPanel(
-  { top: byId("topbar"), status: byId("status"), board: byId("panel") },
+  { top: byId("topbar"), status: byId("readout"), board: byId("panel") },
   {
     onTheme() {
       setTheme(theme === "dark" ? "light" : "dark");
@@ -94,8 +111,7 @@ const panel = createPanel(
       session.loop.speed = x;
     },
     onOpenDecision(index) {
-      // The details drawer arrives with the timeline (Task 6).
-      console.info("open decision", session.history.entries[index]?.req.id);
+      select(index);
     },
     onPolicy(choice) {
       // Same seed, so the two policies can be compared on the same fire.
@@ -105,23 +121,33 @@ const panel = createPanel(
   },
 );
 
+const timeline = createTimeline(byId("timeline"), { onSelect: select });
+const details = createDetails(byId("details"), {
+  onClose: () => select(null),
+  onStep: (dir) => {
+    if (selected !== null) select(selected + dir);
+  },
+});
+
 /** Frame the yard in the part of the scene the floating panels leave free. */
 function fitToPanels(): void {
   const r = (id: string) => byId(id).getBoundingClientRect();
   const stageRect = stage.getBoundingClientRect();
   // On phones the panels stack below the scene instead of floating over it.
   const floating = getComputedStyle(byId("panel")).position === "fixed";
-  view.setInsets(
-    floating
-      ? {
-          top: r("topbar").bottom - stageRect.top,
-          right: stageRect.right - r("panel").left,
-          // The status card sits in the yard's empty bottom-left corner, so it needs no room.
-          bottom: 0,
-          left: 0,
-        }
-      : { top: 0, right: 0, bottom: 0, left: 0 },
-  );
+  const insets = floating
+    ? {
+        top: r("topbar").bottom - stageRect.top,
+        right: stageRect.right - r("panel").left,
+        bottom: stageRect.bottom - r("status").top,
+        left: 0,
+      }
+    : { top: 0, right: 0, bottom: 0, left: 0 };
+  view.setInsets(insets);
+  // The details drawer fits between the top bar and the status card.
+  const root = document.documentElement.style;
+  root.setProperty("--inset-top", `${Math.round(insets.top)}px`);
+  root.setProperty("--inset-bottom", `${Math.round(insets.bottom)}px`);
 }
 const panelsObserver = new ResizeObserver(fitToPanels);
 for (const id of ["topbar", "status", "panel"]) panelsObserver.observe(byId(id));
@@ -165,5 +191,7 @@ view.renderer.setAnimationLoop((now: number) => {
     theme,
     ...(badge.detail === undefined ? {} : { policyDetail: badge.detail }),
   });
+  timeline.update(history, simTime(world), { replayEnd: null, selected });
+  details.show(history, selected);
   view.render();
 });

@@ -12,7 +12,6 @@ import type { Theme } from "../theme";
 import { createDecisionView } from "./decision-view";
 import { el, setText } from "./dom";
 import { entryChosenP, entrySummary, percent, sourceLabel, sourceTone } from "./labels";
-import { sparkPath, sparkTop } from "./spark";
 
 export interface PanelHandlers {
   onPause(): void;
@@ -125,7 +124,7 @@ function button(text: string, onClick: () => void): HTMLButtonElement {
   return b;
 }
 
-/** Where the HUD lives: the top bar, the status card over the scene, and the unit board. */
+/** Where the HUD lives: the top bar, the status card's readout, and the unit board. */
 export interface PanelRoots {
   top: HTMLElement;
   status: HTMLElement;
@@ -137,8 +136,6 @@ const SUN =
   '<circle cx="10" cy="10" r="3.6"/><path d="M10 1.5v2.4M10 16.1v2.4M1.5 10h2.4M16.1 10h2.4M4 4l1.7 1.7M14.3 14.3 16 16M4 16l1.7-1.7M14.3 5.7 16 4"/>';
 const MOON = '<path d="M16.5 12.6A7 7 0 0 1 7.4 3.5a7 7 0 1 0 9.1 9.1Z"/>';
 
-const SPARK_W = 220;
-const SPARK_H = 36;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
@@ -176,20 +173,7 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
   wind.root.classList.add("wind");
   const figures = el("div", "figures");
   figures.append(burned.root, burning.root, wind.root);
-  // How much of the site has burned so far, over the game.
-  const spark = document.createElementNS(SVG_NS, "svg");
-  spark.classList.add("spark");
-  spark.setAttribute("viewBox", `0 0 ${SPARK_W} ${SPARK_H}`);
-  spark.setAttribute("preserveAspectRatio", "none");
-  spark.setAttribute("role", "img");
-  spark.setAttribute("aria-label", "Burned area over time");
-  const sparkArea = document.createElementNS(SVG_NS, "path");
-  sparkArea.classList.add("spark-area");
-  const sparkLine = document.createElementNS(SVG_NS, "path");
-  sparkLine.classList.add("spark-line");
-  spark.append(sparkArea, sparkLine);
-  const sparkCaption = el("p", "spark-caption");
-  readout.append(clockRow, figures, sparkCaption, spark);
+  readout.append(clockRow, figures);
 
   // Controls.
   const controls = el("div", "controls");
@@ -281,7 +265,6 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
   roots.board.replaceChildren(unit, log, keys);
 
   let shownKey = "";
-  let shownSamples = -1;
 
   function renderLog(history: GameHistory, upTo: number): void {
     const rows: HTMLElement[] = [];
@@ -329,15 +312,6 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
       wind.set(`${world.wind.speedKmh} km/h`);
       wind.setWord(`from ${WIND_SHORT[w]}`);
       wind.root.title = `Wind from the ${WIND_FROM[w]}`;
-
-      if (history.samples.length !== shownSamples) {
-        shownSamples = history.samples.length;
-        const top = sparkTop(history.samples);
-        setText(sparkCaption, `Burned area over time, up to ${top}%`);
-        const line = sparkPath(history.samples, SPARK_W, SPARK_H, top);
-        sparkLine.setAttribute("d", line);
-        sparkArea.setAttribute("d", line ? `${line}L${SPARK_W},${SPARK_H}L0,${SPARK_H}Z` : "");
-      }
 
       if (status.theme !== shownTheme) {
         shownTheme = status.theme;
