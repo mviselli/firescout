@@ -398,7 +398,7 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
       );
 
       // Redraw the decision and the log only when a decision lands or one starts.
-      const key = `${history.entries.length}|${status.upTo}|${status.pending?.id ?? ""}`;
+      const key = `${history.id}|${history.entries.length}|${status.upTo}|${status.pending?.id ?? ""}`;
       if (key !== shownKey) {
         shownKey = key;
         decision.show(history.entries[status.upTo - 1] ?? null, status.pending);

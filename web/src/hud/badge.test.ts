@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseRecording, serializeRecording } from "../replay/file";
 import { policyBadge, sourceFromMeta } from "./badge";
 
 describe("policyBadge", () => {
@@ -48,5 +49,36 @@ describe("sourceFromMeta", () => {
       latencyMs: 2,
       fallback: "offline",
     });
+  });
+});
+
+describe("sourceFromMeta with a long brain error", () => {
+  it("keeps the fallback reason short enough for a replay file to reopen", () => {
+    const reason = `brain error: ${"Traceback line\n".repeat(40)}`;
+    const source = sourceFromMeta({
+      source: "fallback",
+      backend: "baseline",
+      reason,
+      latencyMs: 3,
+    });
+    expect(source.fallback?.startsWith("brain error: Traceback line")).toBe(true);
+    expect(source.fallback?.endsWith("…")).toBe(true);
+    const rec = {
+      version: 1 as const,
+      policy: "brain",
+      options: { seed: 1 },
+      decisions: [
+        {
+          id: 1,
+          tick: 0,
+          t: 0,
+          reason: "start" as const,
+          answers: {},
+          source,
+        },
+      ],
+      end: { tick: 0, hash: "00000000" },
+    };
+    expect(() => parseRecording(serializeRecording(rec))).not.toThrow();
   });
 });

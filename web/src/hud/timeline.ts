@@ -214,7 +214,7 @@ export function createTimeline(root: HTMLElement, handlers: TimelineHandlers): T
       const x = Math.round(PAD + scale.x(t));
       // In a replay the playhead splits marks into seen and ahead; the split moves with it.
       const ahead = replay ? h.entries.findIndex((e) => e.req.t > t) : -1;
-      const key = `${h.version}|${span}|${opts.selected}|${width}|${ahead}|${replay}`;
+      const key = `${h.id}|${h.version}|${span}|${opts.selected}|${width}|${ahead}|${replay}`;
       if (key !== shownKey) {
         shownKey = key;
         drawGrid(span);

@@ -3,6 +3,13 @@ import { describe, expect, it } from "vitest";
 import { GameHistory } from "./history";
 
 describe("GameHistory", () => {
+  it("has an id of its own, so views can tell two histories with the same counts apart", () => {
+    const a = new GameHistory();
+    const b = new GameHistory();
+    expect(a.version).toBe(b.version);
+    expect(a.id).not.toBe(b.id);
+  });
+
   it("samples at t=0 and then once per sim second", () => {
     const world = createWorld(1);
     const history = new GameHistory();

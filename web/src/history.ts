@@ -25,9 +25,12 @@ export interface Sample {
 }
 
 const TICKS_PER_SECOND = Math.round(1 / SIM.TICK);
+let nextId = 1;
 
 /** A game's decisions and a once-per-second burn sample, for the log and the timeline. */
 export class GameHistory {
+  /** Unique per history, so a view switching between two (live and replay) redraws even at equal counts. */
+  readonly id = nextId++;
   readonly entries: TimelineEntry[] = [];
   readonly samples: Sample[] = [];
   private changes = 0;

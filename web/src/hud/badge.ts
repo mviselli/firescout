@@ -9,10 +9,16 @@ export interface Badge {
   detail?: string;
 }
 
+/** Replay files cap a fallback reason at 200 characters (`replay/file.ts`). */
+const MAX_REASON = 200;
+
 /** Who answered, from RemotePolicy's meta: the brain's backend, or the rules standing in. */
 export function sourceFromMeta(meta: DecisionMeta): DecisionSource {
   if (meta.source === "brain") return { backend: meta.backend, latencyMs: meta.latencyMs };
-  return { backend: "baseline", latencyMs: meta.latencyMs, fallback: meta.reason ?? "offline" };
+  // A brain error can carry a whole traceback; keep it short enough to save in a replay.
+  let reason = meta.reason ?? "offline";
+  if (reason.length > MAX_REASON) reason = `${reason.slice(0, MAX_REASON - 1)}…`;
+  return { backend: "baseline", latencyMs: meta.latencyMs, fallback: reason };
 }
 
 /** The panel's line saying who answered R1's last decision in this game. */
