@@ -55,3 +55,24 @@ appended to `brain/logs/decisions.jsonl`.
 games end in the same state, whatever the model's latency.
 
 ![R1 driven by Laya, falling back to the rules while the brain is stopped](docs/media/phase2.gif)
+
+## Follow and replay a game
+
+- **Decision card** (right): R1's current task and tanks, then its last call. Every option of the main question
+  gets a bar, and the one R1 acts on is red. `Sure 62%` is Laya's confidence: 0% is an even guess across the
+  options, 100% is certain. Below it, the extinguishing agent Laya picked for each fire it could attack.
+- **Radio log**: the latest calls, newest first. Click one to open its details.
+- **Timeline** (bottom): one stem per decision at its sim time, as tall as Laya was sure. Blue means Laya
+  answered, red means the rules stood in while the brain was away, and a diamond marks a door call. The shaded
+  curve is the burned area. Hover a stem to read it; click it to open the details.
+- **Details drawer**: the state text exactly as the model read it, then every question with every option's
+  description and probability, `Sure` and `Top answer` (the chosen option's calibrated probability).
+  ←/→ walk through the decisions; Esc closes it.
+- **Replay** (`R`): plays the current game again from the start, using only the seed and the recorded answers.
+  Play/Pause, step to the previous or next decision, or click the timeline (or drag the playhead) to seek.
+  **Back to live** (`R` or Esc) returns to the paused game where it was.
+- **Save replay** downloads the game as `firescout-fire-<seed>-<policy>.json`; **Open…** plays a saved file. A
+  file that the current simulation can't reproduce, for example one recorded before a balance change, isn't
+  opened: the panel names the first decision where it diverges and stays in the live game.
+
+![A game with Laya: the decision card and log, the details of a door call, and a replay seek](docs/media/phase3.gif)

@@ -106,3 +106,19 @@ export function historyFromRecording(recording: Recording): GameHistory {
   }
   return history;
 }
+
+/**
+ * A player at t=0 and the recording's whole history (for the timeline and the log), or the reason it
+ * can't be replayed. The whole game is checked up front, so a diverging file never opens.
+ */
+export function loadReplay(
+  recording: Recording,
+): { player: ReplayPlayer; history: GameHistory } | { error: string } {
+  try {
+    const history = historyFromRecording(recording);
+    return { player: new ReplayPlayer(recording), history };
+  } catch (err) {
+    if (!(err instanceof ReplayDesyncError)) throw err;
+    return { error: desyncMessage(err, recording.decisions.length) };
+  }
+}

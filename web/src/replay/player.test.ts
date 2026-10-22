@@ -1,7 +1,7 @@
 import { BaselinePolicy, Engine, type Recording, recordGame, SIM } from "@firescout/sim";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LiveSession } from "../session";
-import { historyFromRecording, ReplayPlayer } from "./player";
+import { historyFromRecording, loadReplay, ReplayPlayer } from "./player";
 
 let rec: Recording;
 
@@ -135,5 +135,34 @@ describe("historyFromRecording", () => {
     expect(built.entries[0]?.source).toEqual({ backend: "baseline" });
     expect(built.entries).toHaveLength(rec.decisions.length);
     expect(built.samples.at(-1)?.t).toBe(Math.floor(rec.end.tick * SIM.TICK + 1e-9));
+  });
+});
+
+describe("loadReplay", () => {
+  it("opens a recording paused at t=0 with its whole history", () => {
+    const loaded = loadReplay(rec);
+    if ("error" in loaded) throw new Error(loaded.error);
+    expect(loaded.player.t).toBe(0);
+    expect(loaded.player.paused).toBe(true);
+    expect(loaded.history.entries).toHaveLength(rec.decisions.length);
+  });
+
+  it("refuses a recording that diverges, naming the decision", () => {
+    const bad = clone(rec);
+    const d = bad.decisions[4];
+    if (!d) throw new Error("too few decisions");
+    d.reason = d.reason === "cadence" ? "blocked" : "cadence";
+    expect(loadReplay(bad)).toEqual({
+      error:
+        `This replay doesn't match the current simulation: it diverges at decision 5 (${d.t.toFixed(1)} s). ` +
+        "It was probably recorded with an older version.",
+    });
+  });
+
+  it("refuses a recording that ends in a different state", () => {
+    const bad = clone(rec);
+    bad.end.hash = "00000000";
+    const loaded = loadReplay(bad);
+    expect("error" in loaded && loaded.error).toContain("it ends in a different state");
   });
 });

@@ -3,13 +3,23 @@ import {
   BaselinePolicy,
   type DecisionSource,
   type Policy,
+  type Recording,
+  SIM,
   simTime,
   type Wind,
 } from "@firescout/sim";
+import type { GameHistory } from "./history";
 import { policyBadge, sourceFromMeta } from "./hud/badge";
 import { createDetails } from "./hud/details";
 import { createPanel, type PolicyChoice } from "./hud/panel";
 import { createTimeline } from "./hud/timeline";
+import {
+  parseRecording,
+  RecordingError,
+  recordingFileName,
+  serializeRecording,
+} from "./replay/file";
+import { loadReplay, type ReplayPlayer } from "./replay/player";
 import { createFire } from "./scene/fire";
 import { createRobotView } from "./scene/robot";
 import { createTerrain } from "./scene/terrain";
@@ -75,6 +85,15 @@ function newSession(): LiveSession {
 
 /** The decision open in the details drawer, as an index into the history. */
 let selected: number | null = null;
+/** A file or replay problem for the panel, shown until dismissed. */
+let notice: string | null = null;
+
+/** Replay mode: a recorded game played back over the paused live session. Null in live mode. */
+let replay: { recording: Recording; player: ReplayPlayer; history: GameHistory } | null = null;
+
+function activeHistory(): GameHistory {
+  return replay ? replay.history : session.history;
+}
 
 function restart(): void {
   // The old session's in-flight answer, if any, is dropped with it.
@@ -83,9 +102,71 @@ function restart(): void {
   selected = null;
 }
 
+function newFire(): void {
+  replay = null;
+  // Only the sim must be deterministic; picking the next seed is a UI choice.
+  seed = 1 + Math.floor(Math.random() * 9999);
+  restart();
+}
+
 function select(index: number | null): void {
-  const count = session.history.entries.length;
+  const count = activeHistory().entries.length;
   selected = index === null || count === 0 ? null : Math.min(Math.max(index, 0), count - 1);
+}
+
+/** Plays a recording from t = 0, paused; the live game waits paused where it was. */
+function openReplay(recording: Recording): void {
+  const loaded = loadReplay(recording);
+  if ("error" in loaded) {
+    notice = loaded.error;
+    backToLive();
+    return;
+  }
+  session.loop.paused = true;
+  loaded.player.speed = speed;
+  replay = { recording, ...loaded };
+  selected = null;
+  notice = null;
+}
+
+function backToLive(): void {
+  if (!replay) return;
+  replay = null;
+  selected = null;
+}
+
+function toggleReplay(): void {
+  if (replay) backToLive();
+  else openReplay(session.recording());
+}
+
+async function openFile(file: File): Promise<void> {
+  try {
+    openReplay(parseRecording(await file.text()));
+  } catch (err) {
+    if (!(err instanceof RecordingError)) throw err;
+    notice = err.message;
+    backToLive();
+  }
+}
+
+function saveReplay(): void {
+  const recording = replay ? replay.recording : session.recording();
+  const url = URL.createObjectURL(
+    new Blob([serializeRecording(recording)], { type: "application/json" }),
+  );
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = recordingFileName(recording);
+  a.click();
+  // The download has started by the next task.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function togglePlay(): void {
+  if (!replay) session.loop.paused = !session.loop.paused;
+  else if (replay.player.paused) replay.player.play();
+  else replay.player.paused = true;
 }
 
 const panel = createPanel(
@@ -94,13 +175,20 @@ const panel = createPanel(
     onTheme() {
       setTheme(theme === "dark" ? "light" : "dark");
     },
-    onPause() {
-      session.loop.paused = !session.loop.paused;
+    onPause: togglePlay,
+    onPlay: togglePlay,
+    onNewSeed: newFire,
+    onReplay: toggleReplay,
+    onBackToLive: backToLive,
+    onSaveReplay: saveReplay,
+    onOpenFile(file) {
+      void openFile(file);
     },
-    onNewSeed() {
-      // Only the sim must be deterministic; picking the next seed is a UI choice.
-      seed = 1 + Math.floor(Math.random() * 9999);
-      restart();
+    onStepDecision(dir) {
+      replay?.player.stepDecision(dir);
+    },
+    onDismissNotice() {
+      notice = null;
     },
     onWind(dirDeg) {
       windFromDeg = dirDeg;
@@ -109,6 +197,7 @@ const panel = createPanel(
     onSpeed(x) {
       speed = x;
       session.loop.speed = x;
+      if (replay) replay.player.speed = x;
     },
     onOpenDecision(index) {
       select(index);
@@ -121,7 +210,10 @@ const panel = createPanel(
   },
 );
 
-const timeline = createTimeline(byId("timeline"), { onSelect: select });
+const timeline = createTimeline(byId("timeline"), {
+  onSelect: select,
+  onSeek: (t) => replay?.player.seek(t),
+});
 const details = createDetails(byId("details"), {
   onClose: () => select(null),
   onStep: (dir) => {
@@ -155,12 +247,22 @@ panelsObserver.observe(document.body);
 fitToPanels();
 
 window.addEventListener("keydown", (e) => {
-  if (e.target instanceof HTMLSelectElement || e.target instanceof HTMLButtonElement) return;
-  if (e.code === "Space") session.loop.paused = !session.loop.paused;
-  else if (e.code === "KeyN") {
-    seed = 1 + Math.floor(Math.random() * 9999);
-    restart();
-  } else if (e.code === "KeyC") view.resetCamera();
+  // The details drawer handles its own keys (←/→, Esc) first.
+  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  if (
+    t instanceof HTMLSelectElement ||
+    t instanceof HTMLButtonElement ||
+    t instanceof HTMLInputElement
+  )
+    return;
+  if (e.code === "Space") togglePlay();
+  else if (e.code === "KeyR") toggleReplay();
+  else if (e.code === "Escape" && replay) backToLive();
+  else if (e.code === "ArrowLeft" && replay) replay.player.stepDecision(-1);
+  else if (e.code === "ArrowRight" && replay) replay.player.stepDecision(1);
+  else if (e.code === "KeyN") newFire();
+  else if (e.code === "KeyC") view.resetCamera();
   else if (e.code === "KeyT") setTheme(theme === "dark" ? "light" : "dark");
   else return;
   e.preventDefault();
@@ -171,27 +273,40 @@ view.renderer.setAnimationLoop((now: number) => {
   const dt = (now - last) / 1000;
   last = now;
   session.advance(dt);
-  const { loop, history } = session;
-  const { world } = loop.engine;
+  replay?.player.advance(dt);
+  const { loop } = session;
+  const history = activeHistory();
+  const world = replay ? replay.player.replay.engine.world : loop.engine.world;
   terrain.update(world);
   fire.update(world.grid, now / 1000);
   robotView.update(world.robot, Math.min(dt, 0.25), now / 1000);
-  const badge = policyBadge(policyChoice, history.last?.source ?? null);
+  const badge = policyBadge(policyChoice, session.history.last?.source ?? null);
+  const player = replay?.player;
   panel.update(world, history, {
     seed,
-    paused: loop.paused,
-    ended: loop.engine.ended,
-    speed: loop.speed,
-    error: loop.error,
+    paused: player ? player.paused : loop.paused,
+    ended: player ? player.ended : loop.engine.ended,
+    speed,
+    error: player ? null : loop.error,
     policyChoice,
     policy: badge.text,
     policyTone: badge.tone,
-    pending: loop.waiting ? loop.engine.pending : null,
-    upTo: history.entries.length,
+    pending: !player && loop.waiting ? loop.engine.pending : null,
+    // A replay shows the decisions made up to the playhead.
+    upTo: player ? player.replay.decided : history.entries.length,
     theme,
+    mode: replay ? "replay" : "live",
+    replay: replay
+      ? { seed: replay.recording.options.seed, policy: replay.recording.policy }
+      : null,
+    // loadReplay plays the whole game before opening it, so the player itself never desyncs here.
+    notice,
     ...(badge.detail === undefined ? {} : { policyDetail: badge.detail }),
   });
-  timeline.update(history, simTime(world), { replayEnd: null, selected });
+  timeline.update(history, simTime(world), {
+    replayEnd: player ? player.replay.endTick * SIM.TICK : null,
+    selected,
+  });
   details.show(history, selected);
   view.render();
 });

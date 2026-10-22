@@ -89,7 +89,8 @@ export function createRobotView(scene: THREE.Scene): RobotView {
     update(robot, dt, timeSec) {
       const [wx, wz] = cellToWorld(robot.x, robot.y);
       target.set(wx, TILE_TOP, wz);
-      if (!placed) {
+      // Snap on the first frame and after a replay seek; glide only between neighbouring cells.
+      if (!placed || pos.distanceTo(target) > 3) {
         pos.copy(target);
         placed = true;
       }

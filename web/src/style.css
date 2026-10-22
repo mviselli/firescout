@@ -171,6 +171,23 @@ body {
   font-size: 19px;
 }
 
+/* Replay mode: the banner takes the place of the fire name and the live badge. */
+.replay-banner {
+  padding: 2px 12px;
+  border: 1.5px solid var(--ink-soft);
+  border-radius: 999px;
+  font-size: 18px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.replay-banner[hidden],
+.fire-name[hidden],
+.policy-badge[hidden],
+.notice[hidden] {
+  display: none;
+}
+
 .policy-badge {
   display: flex;
   align-items: center;
@@ -394,6 +411,10 @@ body {
   font-size: 13px;
 }
 
+.tl-scale.under {
+  opacity: 0.25;
+}
+
 .tl-tick {
   stroke: var(--rule);
   stroke-dasharray: 2 3;
@@ -575,6 +596,21 @@ body {
   box-shadow: inset 0 0 0 1px var(--ink-faint);
 }
 
+/* A file or replay problem, at the top of the board until dismissed. */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--signal) 14%, transparent);
+}
+
+.notice-text {
+  flex: 1;
+}
+
 .decision-error {
   margin-top: 12px;
   padding: 8px 12px;
@@ -651,7 +687,7 @@ body {
   font-weight: 600;
 }
 
-.dv[data-pending] .dv-head {
+.dv[data-pending] :is(.dv-head, .empty) {
   visibility: hidden;
 }
 

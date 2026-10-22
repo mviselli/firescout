@@ -38,7 +38,9 @@ const HIT_PX = 6;
 /** Grab the playhead within this many pixels. */
 const GRAB_PX = 9;
 /** Clock labels at the first of these steps that leaves this much room between them. */
-const LABEL_STEPS = [30, 60, 120, 300, 600];
+const LABEL_STEPS = [5, 10, 15, 30, 60, 120, 300, 600];
+/** Live, the span grows in 30 s steps, so labels stay at 30 s or more; a short replay goes finer. */
+const LIVE_MIN_STEP = 30;
 const LABEL_ROOM = 52;
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
@@ -151,7 +153,7 @@ export function createTimeline(root: HTMLElement, handlers: TimelineHandlers): T
     }
     const index = hovered(x);
     if (index !== null) handlers.onSelect(index);
-    else handlers.onSeek?.(scale.t(x));
+    else if (replay) handlers.onSeek?.(scale.t(x));
   });
   chart.addEventListener("pointercancel", () => {
     dragging = false;
@@ -160,8 +162,11 @@ export function createTimeline(root: HTMLElement, handlers: TimelineHandlers): T
 
   function drawGrid(span: number): void {
     const plotW = width - 2 * PAD;
+    const minStep = replay ? 0 : LIVE_MIN_STEP;
     const step =
-      LABEL_STEPS.find((s) => (s / span) * plotW >= LABEL_ROOM) ?? LABEL_STEPS.at(-1) ?? 30;
+      LABEL_STEPS.find((s) => s >= minStep && (s / span) * plotW >= LABEL_ROOM) ??
+      LABEL_STEPS.at(-1) ??
+      30;
     const parts: string[] = [];
     for (let s = 0; s <= span + 1e-9; s += step) {
       const x = r1(PAD + scale.x(s));
@@ -209,7 +214,7 @@ export function createTimeline(root: HTMLElement, handlers: TimelineHandlers): T
       const x = Math.round(PAD + scale.x(t));
       // In a replay the playhead splits marks into seen and ahead; the split moves with it.
       const ahead = replay ? h.entries.findIndex((e) => e.req.t > t) : -1;
-      const key = `${h.version}|${span}|${opts.selected}|${width}|${ahead}`;
+      const key = `${h.version}|${span}|${opts.selected}|${width}|${ahead}|${replay}`;
       if (key !== shownKey) {
         shownKey = key;
         drawGrid(span);
@@ -227,6 +232,9 @@ export function createTimeline(root: HTMLElement, handlers: TimelineHandlers): T
       if (x !== headX) {
         headX = x;
         head.setAttribute("transform", `translate(${x} 0)`);
+        // The scale label sits top-right; let the playhead pass in front of it.
+        const labelLeft = width - PAD - scaleLabel.getComputedTextLength() - 6;
+        scaleLabel.classList.toggle("under", x >= labelLeft);
       }
     },
   };

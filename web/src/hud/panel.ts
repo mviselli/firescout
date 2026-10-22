@@ -23,9 +23,16 @@ export interface PanelHandlers {
   onTheme(): void;
   /** A log row was clicked: the index into the history's entries. */
   onOpenDecision(index: number): void;
-  /** Missing until replay is wired; the button is then disabled. */
-  onReplay?(): void;
-  onOpenFile?(file: File): void;
+  /** Opens the current game as a replay. */
+  onReplay(): void;
+  onOpenFile(file: File): void;
+  /** Downloads the game shown (live or replay) as a replay file. */
+  onSaveReplay(): void;
+  onBackToLive(): void;
+  /** Replay play/pause. */
+  onPlay(): void;
+  onStepDecision(dir: -1 | 1): void;
+  onDismissNotice(): void;
 }
 
 export type PolicyChoice = "brain" | "baseline";
@@ -51,6 +58,11 @@ export interface PanelStatus {
   /** Entries [0, upTo) are shown: all of them live, those up to the playhead in a replay. */
   upTo: number;
   theme: Theme;
+  mode: "live" | "replay";
+  /** What the replay banner names: the fire and who decided in it. */
+  replay: { seed: number; policy: string } | null;
+  /** A file or replay problem, shown until dismissed. */
+  notice: string | null;
 }
 
 export interface Panel {
@@ -143,7 +155,9 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
   const header = el("div", "board-head");
   const brand = el("div", "brand");
   const fireName = el("p", "fire-name");
-  brand.append(el("h1", "", "FireScout"), fireName);
+  const banner = el("p", "replay-banner");
+  banner.hidden = true;
+  brand.append(el("h1", "", "FireScout"), fireName, banner);
   const policySelect = el("select", "policy-select");
   policySelect.setAttribute("aria-label", "Who decides for R1");
   for (const [value, label] of [
@@ -177,17 +191,27 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
 
   // Controls.
   const controls = el("div", "controls");
-  const pause = button("Pause", () => handlers.onPause());
+  const pause = button("Pause", () =>
+    shownMode === "replay" ? handlers.onPlay() : handlers.onPause(),
+  );
   const newFire = button("New fire", () => handlers.onNewSeed());
-  const replay = button("Replay", () => handlers.onReplay?.());
-  replay.disabled = handlers.onReplay === undefined;
+  const replay = button("Replay", () => handlers.onReplay());
+  replay.title = "Replay this game from the start (R)";
+  const prevDecision = button("Previous", () => handlers.onStepDecision(-1));
+  prevDecision.title = "Go to the previous decision (←)";
+  const nextDecision = button("Next", () => handlers.onStepDecision(1));
+  nextDecision.title = "Go to the next decision (→)";
+  const save = button("Save replay", () => handlers.onSaveReplay());
+  save.title = "Download this game as a replay file";
+  const back = button("Back to live", () => handlers.onBackToLive());
+  back.title = "Return to the live game where it was (R)";
   const fileInput = el("input");
   fileInput.type = "file";
   fileInput.accept = ".json,application/json";
   fileInput.hidden = true;
   fileInput.addEventListener("change", () => {
     const file = fileInput.files?.[0];
-    if (file) handlers.onOpenFile?.(file);
+    if (file) handlers.onOpenFile(file);
     fileInput.value = "";
   });
   const theme = button("", () => handlers.onTheme());
@@ -199,9 +223,10 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
   let shownTheme = "";
   const open = button("Open…", () => fileInput.click());
   open.title = "Open a saved replay";
-  open.disabled = handlers.onOpenFile === undefined;
   const actions = el("div", "actions");
-  actions.append(pause, newFire, replay, open, fileInput);
+  actions.append(pause, prevDecision, nextDecision, newFire, replay, save, open, back, fileInput);
+  const liveOnly = [newFire, replay, open];
+  const replayOnly = [prevDecision, nextDecision, back];
 
   const windSelect = el("select", "wind-select");
   windSelect.setAttribute("aria-label", "Wind");
@@ -246,6 +271,14 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
   decision.root.setAttribute("aria-live", "polite");
   unit.append(unitHead, tanks, decisionError, decision.root);
 
+  // A file or replay problem: it stays until dismissed or the next file opens.
+  const notice = el("div", "notice");
+  notice.setAttribute("role", "alert");
+  notice.hidden = true;
+  const noticeText = el("p", "notice-text");
+  const dismiss = button("Dismiss", () => handlers.onDismissNotice());
+  notice.append(noticeText, dismiss);
+
   // Radio log: the latest decisions, newest first.
   const log = el("section", "log");
   const logHead = el("header", "log-head");
@@ -257,12 +290,14 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
   const keys = el(
     "p",
     "keys",
-    "Space pauses, N starts a new fire, C resets the camera, T switches the theme.",
+    "Space plays or pauses, R opens or leaves the replay, ← → step through decisions in a replay, " +
+      "N starts a new fire, C resets the camera, T switches the theme.",
   );
 
   roots.top.replaceChildren(header, controls);
   roots.status.replaceChildren(readout);
-  roots.board.replaceChildren(unit, log, keys);
+  roots.board.replaceChildren(notice, unit, log, keys);
+  let shownMode = "";
 
   let shownKey = "";
 
@@ -297,13 +332,32 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
   return {
     update(world, history, status) {
       setText(fireName, `Fire ${status.seed}`);
+      if (status.mode !== shownMode) {
+        shownMode = status.mode;
+        const inReplay = status.mode === "replay";
+        for (const b of liveOnly) b.hidden = inReplay;
+        for (const b of replayOnly) b.hidden = !inReplay;
+        policySelect.disabled = inReplay;
+        windSelect.disabled = inReplay;
+        fireName.hidden = inReplay;
+        badge.hidden = inReplay;
+        banner.hidden = !inReplay;
+        document.documentElement.toggleAttribute("data-replay", inReplay);
+      }
+      if (status.replay) {
+        const who = status.replay.policy === "baseline" ? "Rules" : "Laya";
+        setText(banner, `Replay · Fire ${status.replay.seed} · ${who}`);
+      }
+      notice.hidden = status.notice === null;
+      setText(noticeText, status.notice ?? "");
       if (policySelect.value !== status.policyChoice) policySelect.value = status.policyChoice;
       setText(badge, status.policy);
       badge.dataset.tone = status.policyTone;
       badge.title = status.policyDetail ?? "";
 
       setText(clock, `${simTime(world).toFixed(1)} s`);
-      setText(clockState, status.ended ? "Over" : status.paused ? "Paused" : "");
+      const over = status.mode === "replay" ? "End of replay" : "Over";
+      setText(clockState, status.ended ? over : status.paused ? "Paused" : "");
       let cells = 0;
       for (let i = 0; i < N; i++) if (get(world.grid.state, i) === CellState.Burning) cells++;
       burned.set(`${Math.round((1 - savedFraction(world)) * 100)}%`);
@@ -320,8 +374,14 @@ export function createPanel(roots: PanelRoots, handlers: PanelHandlers): Panel {
         theme.title = `Switch to the ${next} theme (T)`;
         theme.setAttribute("aria-label", `Switch to the ${next} theme`);
       }
-      setText(pause, status.paused ? "Resume" : "Pause");
-      pause.disabled = status.ended;
+      if (status.mode === "replay") {
+        setText(pause, status.paused ? "Play" : "Pause");
+        // At the end, Play starts the replay again from the beginning.
+        pause.disabled = false;
+      } else {
+        setText(pause, status.paused ? "Resume" : "Pause");
+        pause.disabled = status.ended;
+      }
       for (const { x, b } of speedButtons)
         b.setAttribute("aria-pressed", String(x === status.speed));
 
